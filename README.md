@@ -6,44 +6,33 @@ A fully-featured browser-based trading terminal that mirrors the MetaTrader 4 (M
 
 ---
 
-## 🚀 How to View / Run the Terminal
+## 🌐 Live Demo
+
+> **👉 [https://virtuex-digital-assets.github.io/vda-trading-terminal](https://virtuex-digital-assets.github.io/vda-trading-terminal)**
+
+Just open that link in any browser — **no installation required**.  
+The terminal runs in **demo mode**: live simulated prices tick every 500 ms without needing a real MT4 connection.
+
+*(The live site is automatically re-deployed every time code is pushed to `main` via GitHub Actions.)*
+
+---
+
+## 🚀 Run Locally (optional)
+
+If you want to run it on your own machine:
 
 ### Step 1 — Prerequisites
 
-Make sure you have **Node.js** (v14 or newer) installed.  
-Download it from [https://nodejs.org](https://nodejs.org) if you don't have it.
+Install **Node.js** (v14 or newer) from [https://nodejs.org](https://nodejs.org).
 
-Check your version:
-```bash
-node -v   # should print v14.x or higher
-npm -v    # should print 6.x or higher
-```
-
-### Step 2 — Install dependencies (first time only)
-
-Open a terminal in the project folder and run:
-```bash
-npm install
-```
-
-### Step 3 — Start the terminal
+### Step 2 — Install & start
 
 ```bash
+npm install   # first time only
 npm start
 ```
 
-### Step 4 — Open your browser
-
-After a few seconds you will see:
-```
-Compiled successfully!
-
-  Local:  http://localhost:3000
-```
-
-👉 **Go to [http://localhost:3000](http://localhost:3000) in your browser.**
-
-The trading terminal will load immediately. It runs in **demo mode** by default — live simulated prices start ticking every 500 ms without needing a real MT4 connection.
+Then open **[http://localhost:3000](http://localhost:3000)** in your browser.
 
 > **To stop the server** press `Ctrl + C` in the terminal.
 

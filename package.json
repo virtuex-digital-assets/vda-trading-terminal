@@ -2,6 +2,7 @@
   "name": "vda-trading-terminal",
   "version": "1.0.0",
   "description": "VDA MetaTrader 4 trading terminal – React frontend with Redux state management, candlestick charts, order management, and MT4 bridge connectivity.",
+  "homepage": "https://virtuex-digital-assets.github.io/vda-trading-terminal",
   "private": true,
   "scripts": {
     "start": "react-scripts start",
