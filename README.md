@@ -104,6 +104,136 @@ That turns off the app.
 
 ---
 
+## 🌐 Make it live online (so anyone in the world can visit it)
+
+The app is already set up to go live for **free** using something called **GitHub Pages**. Think of it like GitHub hosting your website for you. You just need to flip one switch — here's how:
+
+---
+
+### Step 1 — Go to your GitHub repository
+
+Open your browser and go to:
+
+> 👉 **[https://github.com/virtuex-digital-assets/vda-trading-terminal](https://github.com/virtuex-digital-assets/vda-trading-terminal)**
+
+---
+
+### Step 2 — Open the Settings
+
+Click the **"Settings"** tab near the top of the page (it has a gear icon ⚙️).
+
+---
+
+### Step 3 — Find "Pages" in the left menu
+
+On the left side of the Settings page, scroll down and click **"Pages"**.
+
+---
+
+### Step 4 — Turn on GitHub Pages
+
+Under **"Source"**, click the dropdown that says **"None"** and change it to **"GitHub Actions"**.
+
+Then click **Save**.
+
+---
+
+### Step 5 — Merge this PR to main
+
+Once the PR is merged into the `main` branch, GitHub will automatically:
+1. Build the app ⚙️
+2. Put it live on the internet 🚀
+
+This takes about **2–3 minutes**.
+
+---
+
+### Step 6 — Visit your live site!
+
+Once it's done, your site will be live at:
+
+> 👉 **[https://virtuex-digital-assets.github.io/vda-trading-terminal](https://virtuex-digital-assets.github.io/vda-trading-terminal)**
+
+Just open that link in any browser — from any device, anywhere in the world! 🌍
+
+> Every time you push new code to `main`, the site automatically updates itself. You don't have to do anything!
+
+---
+
+## 🏠 Use your own domain name (e.g. `www.mysite.com`)
+
+Want the site to have your own web address instead of the long GitHub one? Here's how — step by step.
+
+---
+
+### What you need first
+
+You need to **buy a domain name** (like `mysite.com`). You can buy one from:
+- [Namecheap](https://www.namecheap.com) (~$10/year)
+- [Google Domains](https://domains.google) (~$12/year)
+- [GoDaddy](https://www.godaddy.com) (~$12/year)
+
+Once you've bought one, come back here and follow these steps:
+
+---
+
+### Step A — Point your domain to GitHub
+
+1. Log in to wherever you bought your domain (e.g. Namecheap)
+2. Find the **DNS settings** for your domain (sometimes called "Advanced DNS" or "Manage DNS")
+3. Add these **4 records** (they tell the internet to send visitors to GitHub):
+
+| Type | Host | Value |
+|---|---|---|
+| A | @ | 185.199.108.153 |
+| A | @ | 185.199.109.153 |
+| A | @ | 185.199.110.153 |
+| A | @ | 185.199.111.153 |
+
+4. Also add this record (for the `www.` version):
+
+| Type | Host | Value |
+|---|---|---|
+| CNAME | www | virtuex-digital-assets.github.io |
+
+5. Save the changes. DNS can take up to **24 hours** to spread around the internet (usually much faster).
+
+---
+
+### Step B — Tell GitHub your domain name
+
+1. Go back to your GitHub repo → **Settings** → **Pages**
+2. Under **"Custom domain"**, type in your domain (e.g. `www.mysite.com`)
+3. Click **Save**
+4. GitHub will automatically turn on **HTTPS** (the padlock 🔒) for free — just tick "Enforce HTTPS" if it's not already ticked
+
+---
+
+### Step C — Add a CNAME file to the project
+
+This file tells GitHub "remember my custom domain even after a new deploy":
+
+1. In the `public/` folder of this project, create a file called `CNAME` (no file extension)
+2. Inside it, put just your domain name on one line, for example:
+
+```
+www.mysite.com
+```
+
+3. Save it, commit it, and push to `main` — GitHub Pages will pick it up automatically
+
+---
+
+### Step D — Visit your site on your new domain!
+
+After DNS has updated (give it up to 24 hours), open your browser and go to:
+
+> 👉 **`https://www.mysite.com`**
+
+Your trading terminal will load on your very own web address! 🎉
+
+---
+
 ## 🤔 What can I do in the app?
 
 Here's what you'll see when you open it:
