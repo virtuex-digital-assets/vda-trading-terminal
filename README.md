@@ -2,6 +2,51 @@
 
 A fully-featured browser-based trading terminal that mirrors the MetaTrader 4 (MT4) experience. Built with **React 17**, **Redux**, and an HTML5 Canvas charting engine.
 
+![VDA Trading Terminal](https://github.com/user-attachments/assets/a222cdf7-c337-47be-94c9-011c123b3a3f)
+
+---
+
+## 🚀 How to View / Run the Terminal
+
+### Step 1 — Prerequisites
+
+Make sure you have **Node.js** (v14 or newer) installed.  
+Download it from [https://nodejs.org](https://nodejs.org) if you don't have it.
+
+Check your version:
+```bash
+node -v   # should print v14.x or higher
+npm -v    # should print 6.x or higher
+```
+
+### Step 2 — Install dependencies (first time only)
+
+Open a terminal in the project folder and run:
+```bash
+npm install
+```
+
+### Step 3 — Start the terminal
+
+```bash
+npm start
+```
+
+### Step 4 — Open your browser
+
+After a few seconds you will see:
+```
+Compiled successfully!
+
+  Local:  http://localhost:3000
+```
+
+👉 **Go to [http://localhost:3000](http://localhost:3000) in your browser.**
+
+The trading terminal will load immediately. It runs in **demo mode** by default — live simulated prices start ticking every 500 ms without needing a real MT4 connection.
+
+> **To stop the server** press `Ctrl + C` in the terminal.
+
 ---
 
 ## Features
@@ -21,13 +66,11 @@ A fully-featured browser-based trading terminal that mirrors the MetaTrader 4 (M
 
 ---
 
-## Quick Start
+## Other Commands
 
 ```bash
-npm install
-npm start          # development server on http://localhost:3000
-npm run build      # production build → build/
-npm test           # run test suite
+npm run build      # Create an optimised production build → build/
+npm test           # Run the test suite (28 tests)
 ```
 
 ---
