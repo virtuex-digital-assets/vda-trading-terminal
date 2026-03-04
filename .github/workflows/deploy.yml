@@ -2,7 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - copilot/build-meta-trader-4-system  # temporary: deploy until PR is merged to main
   workflow_dispatch:
 
 permissions:
