@@ -1,121 +1,137 @@
-# VDA Trading Terminal – MetaTrader 4
+# VDA Trading Terminal
 
-A fully-featured browser-based trading terminal that mirrors the MetaTrader 4 (MT4) experience. Built with **React 17**, **Redux**, and an HTML5 Canvas charting engine.
+This is a **trading app** that runs in your web browser. It shows live prices and lets you practice buying and selling currencies and other assets. 📈
 
 ![VDA Trading Terminal](https://github.com/user-attachments/assets/a222cdf7-c337-47be-94c9-011c123b3a3f)
 
 ---
 
-## 🌐 Live Demo
+## 👀 Want to see it right now?
 
-> **👉 [https://virtuex-digital-assets.github.io/vda-trading-terminal](https://virtuex-digital-assets.github.io/vda-trading-terminal)**
+**Just click this link and it opens in your browser — nothing to install!**
 
-Just open that link in any browser — **no installation required**.  
-The terminal runs in **demo mode**: live simulated prices tick every 500 ms without needing a real MT4 connection.
+> 👉 **[https://virtuex-digital-assets.github.io/vda-trading-terminal](https://virtuex-digital-assets.github.io/vda-trading-terminal)**
 
-*(The live site is automatically re-deployed every time code is pushed to `main` via GitHub Actions.)*
+That's it! The app will open and prices will start moving on their own. 🎉
 
 ---
 
-## 🚀 Run Locally (optional)
+## 💻 Want to run it on your own computer instead?
 
-If you want to run it on your own machine:
+Follow these steps **one at a time**. Take your time — there's no rush!
 
-### Step 1 — Prerequisites
+---
 
-Install **Node.js** (v14 or newer) from [https://nodejs.org](https://nodejs.org).
+### Step 1 — Download Node.js
 
-### Step 2 — Install & start
+Node.js is a helper program that lets the app run on your computer.
 
-```bash
-npm install   # first time only
+1. Go to 👉 **[https://nodejs.org](https://nodejs.org)**
+2. Click the big green button that says **"LTS"** (that's the safe, stable version)
+3. Download and install it — just click **Next** on everything, like any normal program
+4. When it's done, close and reopen your terminal / command prompt
+
+---
+
+### Step 2 — Open your terminal (the black text window)
+
+- **Windows**: Press the `Windows` key, type `cmd`, press `Enter`
+- **Mac**: Press `Cmd + Space`, type `Terminal`, press `Enter`
+
+---
+
+### Step 3 — Go to the project folder
+
+Type this and press `Enter` (change the path to wherever you saved the project):
+
+```
+cd C:\path\to\vda-trading-terminal
+```
+
+*(On Mac it looks like: `cd /Users/yourname/vda-trading-terminal`)*
+
+---
+
+### Step 4 — Install the app's pieces (first time only)
+
+Type this and press `Enter`:
+
+```
+npm install
+```
+
+⏳ Wait for it to finish. You'll see a lot of text scrolling — that's normal! It usually takes about 1–2 minutes.
+
+---
+
+### Step 5 — Start the app
+
+Type this and press `Enter`:
+
+```
 npm start
 ```
 
-Then open **[http://localhost:3000](http://localhost:3000)** in your browser.
+⏳ Wait about 10–20 seconds. When you see:
 
-> **To stop the server** press `Ctrl + C` in the terminal.
+```
+Compiled successfully!
+```
+
+...the app is ready! 🎉
 
 ---
 
-## Features
+### Step 6 — Open it in your browser
 
-| Feature | Details |
+Open **Google Chrome**, **Firefox**, or any browser and go to:
+
+> 👉 **[http://localhost:3000](http://localhost:3000)**
+
+The trading terminal will open and prices will start moving automatically. No real money is involved — it's just a demo!
+
+---
+
+### Step 7 — How to stop it
+
+When you're done, go back to the terminal and press:
+
+```
+Ctrl + C
+```
+
+That turns off the app.
+
+---
+
+## 🤔 What can I do in the app?
+
+Here's what you'll see when you open it:
+
+| What you see | What it does |
 |---|---|
-| **Real-time Market Watch** | Live bid/ask prices, percentage change for 10 symbols |
-| **Candlestick Chart** | Canvas-rendered OHLCV chart, 8 timeframes (M1 → W1), price line |
-| **Order Panel** | Market (BUY/SELL) and pending (BUY/SELL LIMIT/STOP) orders with lot size, SL, TP |
-| **Positions** | Open trades with live floating P&L, one-click close |
-| **Pending Orders** | List of active limit/stop orders |
-| **Trade History** | Closed-order archive |
-| **Account Info** | Balance, equity, margin, free margin, leverage |
-| **Terminal Log** | Time-stamped log of all events |
-| **MT4 Bridge** | WebSocket bridge for a live MT4 EA/server; falls back to built-in demo simulator |
-| **Redux DevTools** | Supported (install the browser extension) |
+| **Market Watch** (left panel) | Shows live prices for 10 currencies and assets like Gold and Bitcoin |
+| **Chart** (middle) | Shows a price chart — you can switch between different time views |
+| **Order Panel** (right) | Where you click BUY or SELL to practice placing a trade |
+| **Positions** (bottom) | Shows trades you have open right now |
+| **History** | Shows trades you already closed |
+| **Account Info** | Shows your pretend balance and profit/loss |
 
 ---
 
-## Other Commands
+## 🪙 Which assets are in the app?
 
-```bash
-npm run build      # Create an optimised production build → build/
-npm test           # Run the test suite (28 tests)
-```
+`EURUSD` · `GBPUSD` · `USDJPY` · `XAUUSD` (Gold) · `USDCHF` · `AUDUSD` · `USDCAD` · `NZDUSD` · `BTCUSD` · `ETHUSD`
 
 ---
 
-## Connecting a Live MT4 Bridge
+## ❓ Something not working?
 
-Set the `REACT_APP_MT4_BRIDGE_URL` environment variable to the WebSocket URL of your MT4 bridge server before starting:
-
-```bash
-REACT_APP_MT4_BRIDGE_URL=ws://localhost:5000 npm start
-```
-
-### Expected WebSocket message formats
-
-| Type | Payload |
+| Problem | Fix |
 |---|---|
-| `quote` | `{ type, symbol, bid, ask, time }` |
-| `candles` | `{ type, symbol, timeframe, data: [{time,open,high,low,close,volume}] }` |
-| `candle` | `{ type, symbol, timeframe, data: {time,open,high,low,close,volume} }` |
-| `account` | `{ type, data: { balance, equity, margin, … } }` |
-
-If no bridge URL is set the built-in **demo simulator** starts automatically, generating realistic random-walk price data so you can explore the UI without a live MT4 installation.
-
----
-
-## Project Structure
-
-```
-src/
-├── App.js / App.css              Main application & layout
-├── index.js                      React entry point
-├── components/
-│   ├── MarketWatch/              Symbol list with live bid/ask
-│   ├── Chart/                    Canvas candlestick chart + timeframe switcher
-│   ├── OrderPanel/               New order form (market & pending)
-│   ├── Positions/                Tabs: Positions / Orders / History
-│   ├── AccountInfo/              Account summary + connection indicator
-│   ├── Terminal/                 Event log
-│   └── shared.css                Shared panel header style
-├── store/
-│   ├── index.js                  Redux store
-│   ├── rootReducer.js            Combined reducers
-│   ├── actions/                  Action creators & type constants
-│   └── reducers/                 market / orders / account / connection / terminal
-├── services/
-│   └── mt4Bridge.js              WebSocket bridge + simulator orchestration
-└── utils/
-    ├── marketSimulator.js        OHLCV candle generator (random-walk)
-    └── formatters.js             Price / profit / datetime formatters
-```
-
----
-
-## Symbols Supported
-
-`EURUSD`, `GBPUSD`, `USDJPY`, `XAUUSD`, `USDCHF`, `AUDUSD`, `USDCAD`, `NZDUSD`, `BTCUSD`, `ETHUSD`
+| *"npm is not recognized"* | You need to install Node.js (see Step 1 above) |
+| *"localhost:3000 can't be reached"* | Make sure you ran `npm start` and waited for "Compiled successfully!" |
+| *Page is blank or broken* | Try a hard refresh: `Ctrl + Shift + R` (Windows) or `Cmd + Shift + R` (Mac) |
 
 ---
 
