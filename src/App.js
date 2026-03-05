@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
@@ -9,6 +9,7 @@ import OrderPanel from './components/OrderPanel/OrderPanel';
 import Positions from './components/Positions/Positions';
 import AccountInfo from './components/AccountInfo/AccountInfo';
 import Terminal from './components/Terminal/Terminal';
+import CRMView from './components/CRM/CRMView';
 
 import './components/shared.css';
 import './App.css';
@@ -16,6 +17,8 @@ import './App.css';
 const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
 
 const AppInner = () => {
+  const [appMode, setAppMode] = useState('terminal'); // 'terminal' | 'crm'
+
   useEffect(() => {
     if (MT4_BRIDGE_URL) {
       mt4Bridge.connect(MT4_BRIDGE_URL);
@@ -29,41 +32,65 @@ const AppInner = () => {
     <div className="terminal-root">
       {/* ── Top bar ──────────────────────────────────────────────────── */}
       <header className="top-bar">
-        <span className="logo">VDA Trading Terminal</span>
-        <span className="logo-sub">MetaTrader 4 Bridge</span>
-        <div className="top-actions">
+        <span className="logo">VDA</span>
+        <span className="logo-sub">{appMode === 'crm' ? 'CRM System' : 'Trading Terminal · MetaTrader 4 Bridge'}</span>
+
+        {/* App mode toggle */}
+        <div className="app-mode-nav">
           <button
-            className="top-btn"
-            title="Restart simulator"
-            onClick={() => { mt4Bridge.stopSimulator(); mt4Bridge.startSimulator(); }}
+            className={`mode-btn${appMode === 'terminal' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('terminal')}
           >
-            ↺ Reset Demo
+            📈 Trading Terminal
           </button>
+          <button
+            className={`mode-btn${appMode === 'crm' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('crm')}
+          >
+            👥 CRM
+          </button>
+        </div>
+
+        <div className="top-actions">
+          {appMode === 'terminal' && (
+            <button
+              className="top-btn"
+              title="Restart simulator"
+              onClick={() => { mt4Bridge.stopSimulator(); mt4Bridge.startSimulator(); }}
+            >
+              ↺ Reset Demo
+            </button>
+          )}
         </div>
       </header>
 
-      {/* ── Main layout ──────────────────────────────────────────────── */}
-      <div className="main-layout">
-        {/* Left sidebar: Market Watch + Account */}
-        <div className="left-sidebar">
-          <MarketWatch />
-          <AccountInfo />
-        </div>
+      {/* ── CRM view ─────────────────────────────────────────────────── */}
+      {appMode === 'crm' && <CRMView />}
 
-        {/* Center: Chart + Positions + Terminal */}
-        <div className="center-area">
-          <Chart />
-          <div className="bottom-panels">
-            <Positions />
-            <Terminal />
+      {/* ── Trading terminal layout ───────────────────────────────────── */}
+      {appMode === 'terminal' && (
+        <div className="main-layout">
+          {/* Left sidebar: Market Watch + Account */}
+          <div className="left-sidebar">
+            <MarketWatch />
+            <AccountInfo />
+          </div>
+
+          {/* Center: Chart + Positions + Terminal */}
+          <div className="center-area">
+            <Chart />
+            <div className="bottom-panels">
+              <Positions />
+              <Terminal />
+            </div>
+          </div>
+
+          {/* Right sidebar: Order Panel */}
+          <div className="right-sidebar">
+            <OrderPanel />
           </div>
         </div>
-
-        {/* Right sidebar: Order Panel */}
-        <div className="right-sidebar">
-          <OrderPanel />
-        </div>
-      </div>
+      )}
     </div>
   );
 };

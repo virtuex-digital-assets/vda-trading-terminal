@@ -1,0 +1,268 @@
+/* ── Client Profile ───────────────────────────────────────────────────────── */
+
+.client-profile {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1a2e;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+
+.cp-header {
+  background: #0f1729;
+  border-bottom: 1px solid #2a2a4a;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.cp-back-btn {
+  background: none;
+  border: 1px solid #2a2a4a;
+  color: #8899bb;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cp-back-btn:hover { border-color: #4488cc; color: #4fc3f7; }
+
+.cp-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: #c8d0e0;
+}
+
+.cp-id {
+  font-size: 11px;
+  color: #5566aa;
+}
+
+.cp-header-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.cp-assigned {
+  margin-left: auto;
+  font-size: 11px;
+  color: #5566aa;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+
+.cp-tabs {
+  display: flex;
+  background: #0f1729;
+  border-bottom: 2px solid #2a2a4a;
+  flex-shrink: 0;
+}
+
+.cp-tab {
+  padding: 7px 18px;
+  font-size: 12px;
+  color: #5566aa;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.15s;
+}
+
+.cp-tab:hover { color: #c8d0e0; }
+.cp-tab.active { color: #4fc3f7; border-bottom-color: #4fc3f7; font-weight: 700; }
+
+/* ── Tab content ──────────────────────────────────────────────────────────── */
+
+.cp-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ── Overview grid ────────────────────────────────────────────────────────── */
+
+.cp-overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.cp-section {
+  background: #16213e;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.cp-section-title {
+  font-size: 10px;
+  color: #5566aa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.cp-kv {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #1e1e3a;
+  font-size: 12px;
+}
+
+.cp-kv:last-child { border-bottom: none; }
+
+.cp-kv-label { color: #5566aa; }
+.cp-kv-val   { color: #c8d0e0; font-weight: 600; }
+.cp-kv-val.positive { color: #66bb6a; }
+.cp-kv-val.negative { color: #ef5350; }
+
+/* ── Stage selector ───────────────────────────────────────────────────────── */
+
+.cp-stage-select {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  color: #c8d0e0;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ── KYC selector ─────────────────────────────────────────────────────────── */
+
+.cp-kyc-select {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  color: #c8d0e0;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ── Accounts list ────────────────────────────────────────────────────────── */
+
+.cp-account-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #4fc3f7;
+  margin-bottom: 8px;
+}
+
+.cp-account-icon { font-size: 16px; }
+
+.cp-no-accounts {
+  padding: 14px;
+  color: #5566aa;
+  font-size: 12px;
+}
+
+/* ── Transactions table ───────────────────────────────────────────────────── */
+
+.cp-tx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cp-tx-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 10px;
+  color: #5566aa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #0f3460;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.cp-tx-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #1e1e3a;
+  color: #c8d0e0;
+}
+
+.cp-tx-table .deposit  { color: #66bb6a; }
+.cp-tx-table .withdrawal { color: #ef5350; }
+.cp-tx-table .completed { color: #66bb6a; }
+
+/* ── Notes ────────────────────────────────────────────────────────────────── */
+
+.cp-note-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cp-note-input {
+  flex: 1;
+  background: #16213e;
+  border: 1px solid #2a2a4a;
+  color: #c8d0e0;
+  padding: 7px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  outline: none;
+  resize: none;
+  height: 56px;
+}
+
+.cp-note-input:focus { border-color: #4488cc; }
+
+.cp-note-submit {
+  background: #0f3460;
+  border: 1px solid #4488cc;
+  color: #4fc3f7;
+  padding: 7px 16px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  align-self: flex-end;
+}
+
+.cp-note-submit:hover { background: #16408a; }
+
+.cp-note-item {
+  background: #16213e;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.cp-note-meta {
+  font-size: 10px;
+  color: #5566aa;
+  margin-bottom: 5px;
+}
+
+.cp-note-text {
+  font-size: 12px;
+  color: #c8d0e0;
+  line-height: 1.5;
+}
+
+.cp-no-notes {
+  color: #5566aa;
+  font-size: 12px;
+  padding: 8px 0;
+}

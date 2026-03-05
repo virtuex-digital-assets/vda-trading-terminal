@@ -1,0 +1,170 @@
+/* ── CRM Dashboard ────────────────────────────────────────────────────────── */
+
+.crm-dash {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: 16px;
+  gap: 16px;
+  background: #1a1a2e;
+}
+
+.crm-dash h2 {
+  font-size: 14px;
+  color: #8899bb;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 10px 0;
+  font-weight: 700;
+}
+
+/* ── Stat cards row ───────────────────────────────────────────────────────── */
+
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.stat-card {
+  background: #16213e;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-card-label {
+  font-size: 11px;
+  color: #5566aa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-card-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #c8d0e0;
+}
+
+.stat-card-value.positive { color: #66bb6a; }
+.stat-card-value.accent   { color: #4fc3f7; }
+
+.stat-card-sub {
+  font-size: 10px;
+  color: #3a4a6a;
+}
+
+/* ── Bottom two-column grid ───────────────────────────────────────────────── */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.dash-panel {
+  background: #16213e;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dash-panel-header {
+  background: #0f3460;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #c8d0e0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.dash-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+/* ── Stage breakdown bars ─────────────────────────────────────────────────── */
+
+.stage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.stage-label {
+  width: 110px;
+  color: #8899bb;
+  flex-shrink: 0;
+}
+
+.stage-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: #1a1a2e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stage-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s;
+}
+
+.stage-count {
+  width: 22px;
+  text-align: right;
+  color: #5566aa;
+  font-size: 11px;
+}
+
+/* Stage colours */
+.stage-bar-New\.Lead    { background: #5566aa; }
+.stage-bar-Contacted    { background: #4fc3f7; }
+.stage-bar-KYC\.Submitted { background: #ffa726; }
+.stage-bar-KYC\.Verified  { background: #ab47bc; }
+.stage-bar-Funded       { background: #29b6f6; }
+.stage-bar-Active       { background: #66bb6a; }
+.stage-bar-Inactive     { background: #ef5350; }
+
+/* ── Top clients table ────────────────────────────────────────────────────── */
+
+.top-clients-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.top-clients-table th {
+  text-align: left;
+  padding: 5px 12px;
+  font-size: 10px;
+  color: #5566aa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.top-clients-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #1e1e3a;
+  color: #c8d0e0;
+}
+
+.top-clients-table tr:hover td { background: #1e2a4a; }
+
+.top-clients-table .positive { color: #66bb6a; }
+.top-clients-table .negative { color: #ef5350; }

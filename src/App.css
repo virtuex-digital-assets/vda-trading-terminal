@@ -46,6 +46,37 @@ html, body, #root {
   gap: 8px;
 }
 
+/* ── App mode navigation (Terminal / CRM) ─────────────────────────────────── */
+
+.app-mode-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 16px;
+  background: #0f1729;
+  border: 1px solid #2a2a4a;
+  border-radius: 5px;
+  padding: 2px;
+}
+
+.mode-btn {
+  background: none;
+  border: none;
+  color: #5566aa;
+  padding: 3px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mode-btn:hover { color: #c8d0e0; background: #16213e; }
+
+.mode-btn.mode-active {
+  background: #16213e;
+  color: #4fc3f7;
+  font-weight: 700;
+}
+
 .top-btn {
   background: #16213e;
   border: 1px solid #2a2a4a;
