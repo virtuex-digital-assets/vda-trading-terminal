@@ -2,7 +2,11 @@
 
 A standalone **Client Relationship Management** app built with React and Redux. 📋
 
-![VDA CRM System](https://github.com/user-attachments/assets/a222cdf7-c337-47be-94c9-011c123b3a3f)
+---
+
+> ### 🚀 Want to put this online? Read the easy guide first!
+> **[➡ DEPLOY.md — Step-by-step go-live guide (plain English)](./DEPLOY.md)**
+> *(Or run `./go-live.sh https://github.com/YOUR-USERNAME/vda-crm-system.git` to do it in one command!)*
 
 ---
 
@@ -46,13 +50,21 @@ npm run build
 
 ## 🚀 Deploy to GitHub Pages
 
-Push to the `main` branch — GitHub Actions builds and deploys automatically.
+📖 **[Full step-by-step guide → DEPLOY.md](./DEPLOY.md)**
 
-The live URL is:
+**Quick version:**
 
-> 👉 **[https://virtuex-digital-assets.github.io/vda-crm-system](https://virtuex-digital-assets.github.io/vda-crm-system)**
+1. Create a new repo called `vda-crm-system` on GitHub (public, empty)
+2. Run the helper script:
+   ```bash
+   chmod +x go-live.sh
+   ./go-live.sh https://github.com/YOUR-USERNAME/vda-crm-system.git
+   ```
+3. Watch the **Actions** tab — the robot builds and deploys automatically (~2 min)
+4. Go to **Settings → Pages → Branch → `gh-pages` → Save**
+5. Open 🎉 `https://YOUR-USERNAME.github.io/vda-crm-system`
 
-> **First deploy:** Go to **Settings → Pages → Source → Deploy from a branch** and select the `gh-pages` branch.
+> **First deploy only:** You need to set the Pages branch to `gh-pages` once in Settings.
 
 ---
 
