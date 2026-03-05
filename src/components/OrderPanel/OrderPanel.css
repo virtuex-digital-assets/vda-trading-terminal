@@ -1,0 +1,124 @@
+.order-panel {
+  background: #16213e;
+  border-left: 1px solid #2a2a4a;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-width: 200px;
+}
+
+.op-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.op-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.op-row label {
+  font-size: 11px;
+  color: #8899bb;
+  min-width: 80px;
+}
+
+.op-value {
+  font-size: 12px;
+  color: #c8d0e0;
+  text-align: right;
+}
+
+.op-value.sym {
+  font-weight: 700;
+  color: #e0e8ff;
+}
+
+.bid { color: #4fc3f7; }
+.ask { color: #ef5350; }
+
+.op-input, .op-select {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  color: #c8d0e0;
+  padding: 3px 6px;
+  font-size: 12px;
+  border-radius: 2px;
+  width: 110px;
+  text-align: right;
+}
+
+.op-input:focus, .op-select:focus {
+  outline: none;
+  border-color: #4488cc;
+}
+
+.op-quick-lots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 2px 0;
+}
+
+.lot-btn {
+  background: #1a2a4a;
+  border: 1px solid #2a3a5a;
+  color: #8899bb;
+  padding: 2px 5px;
+  font-size: 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.lot-btn:hover {
+  background: #0f3460;
+  color: #e0e8ff;
+}
+
+.op-divider {
+  height: 1px;
+  background: #2a2a4a;
+  margin: 4px 0;
+}
+
+.op-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.op-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.op-btn.buy {
+  background: #26a69a;
+  color: #fff;
+}
+
+.op-btn.sell {
+  background: #ef5350;
+  color: #fff;
+}
+
+.op-btn:hover { opacity: 0.85; }
+.op-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+.op-warn {
+  text-align: center;
+  font-size: 11px;
+  color: #ffcc44;
+  margin-top: 4px;
+}

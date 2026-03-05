@@ -1,0 +1,25 @@
+// Redux action types for the MT4 trading terminal
+
+// Market data
+export const UPDATE_QUOTE = 'UPDATE_QUOTE';
+export const SET_ACTIVE_SYMBOL = 'SET_ACTIVE_SYMBOL';
+export const ADD_CANDLE = 'ADD_CANDLE';
+export const SET_CANDLES = 'SET_CANDLES';
+export const SET_TIMEFRAME = 'SET_TIMEFRAME';
+
+// Orders
+export const PLACE_ORDER = 'PLACE_ORDER';
+export const CLOSE_ORDER = 'CLOSE_ORDER';
+export const MODIFY_ORDER = 'MODIFY_ORDER';
+export const UPDATE_ORDER_PROFIT = 'UPDATE_ORDER_PROFIT';
+
+// Account
+export const UPDATE_ACCOUNT = 'UPDATE_ACCOUNT';
+export const SET_LEVERAGE = 'SET_LEVERAGE';
+
+// Connection
+export const SET_CONNECTION_STATUS = 'SET_CONNECTION_STATUS';
+
+// Terminal log
+export const ADD_LOG = 'ADD_LOG';
+export const CLEAR_LOG = 'CLEAR_LOG';

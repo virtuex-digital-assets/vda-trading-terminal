@@ -1,0 +1,64 @@
+.chart-panel {
+  background: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  background: #0f3460;
+  padding: 4px 10px;
+  gap: 8px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.chart-symbol {
+  font-weight: 700;
+  font-size: 14px;
+  color: #e0e8ff;
+  margin-right: 4px;
+}
+
+.chart-price {
+  font-size: 13px;
+  font-weight: 600;
+}
+.chart-price.bid { color: #4fc3f7; }
+.chart-price.ask { color: #ef5350; }
+
+.separator { color: #5566aa; }
+
+.tf-buttons {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.tf-btn {
+  background: #16213e;
+  color: #8899bb;
+  border: 1px solid #2a2a4a;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+
+.tf-btn:hover { background: #1e2a4a; color: #ccd; }
+.tf-btn.active { background: #0f3460; color: #e0e8ff; border-color: #4488cc; }
+
+.chart-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.chart-canvas {
+  width: 100%;
+  height: 100%;
+}
