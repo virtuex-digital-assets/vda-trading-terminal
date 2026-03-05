@@ -1,0 +1,12 @@
+// CRM action types
+
+export const CRM_SET_VIEW = 'CRM_SET_VIEW';
+export const CRM_SELECT_CLIENT = 'CRM_SELECT_CLIENT';
+export const CRM_ADD_CLIENT = 'CRM_ADD_CLIENT';
+export const CRM_UPDATE_CLIENT = 'CRM_UPDATE_CLIENT';
+export const CRM_SET_SEARCH = 'CRM_SET_SEARCH';
+export const CRM_SET_STAGE_FILTER = 'CRM_SET_STAGE_FILTER';
+export const CRM_ADD_NOTE = 'CRM_ADD_NOTE';
+export const CRM_ADD_TRANSACTION = 'CRM_ADD_TRANSACTION';
+export const CRM_DELETE_CLIENT = 'CRM_DELETE_CLIENT';
+export const CRM_SET_REP_FILTER = 'CRM_SET_REP_FILTER';
