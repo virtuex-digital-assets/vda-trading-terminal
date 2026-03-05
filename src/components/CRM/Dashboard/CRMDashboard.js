@@ -29,6 +29,10 @@ const CRMDashboard = () => {
   const totalDeposits     = clients.reduce((s, c) => s + c.totalDeposits, 0);
   const totalWithdrawals  = clients.reduce((s, c) => s + c.totalWithdrawals, 0);
   const netDeposits       = totalDeposits - totalWithdrawals;
+  const totalOpenPL       = clients.reduce((s, c) => s + (c.openPL || 0), 0);
+  // Conversion rate = Active ÷ all clients who entered the funnel (excluding Inactive)
+  const funnelClients     = clients.filter((c) => c.stage !== 'Inactive').length;
+  const conversionRate    = funnelClients > 0 ? ((activeClients / funnelClients) * 100).toFixed(1) : '0.0';
 
   // Stage counts
   const stageCounts = Object.fromEntries(STAGES.map((s) => [s, 0]));
@@ -69,6 +73,18 @@ const CRMDashboard = () => {
           <span className="stat-card-label">Net Funds</span>
           <span className={`stat-card-value ${netDeposits >= 0 ? 'positive' : ''}`}>{fmt(netDeposits)}</span>
           <span className="stat-card-sub">deposits − withdrawals</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Open P&amp;L</span>
+          <span className={`stat-card-value ${totalOpenPL >= 0 ? 'positive' : 'negative'}`}>
+            {totalOpenPL >= 0 ? '+' : ''}{fmt(Math.abs(totalOpenPL))}
+          </span>
+          <span className="stat-card-sub">across all accounts</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Conversion Rate</span>
+          <span className="stat-card-value accent">{conversionRate}%</span>
+          <span className="stat-card-sub">leads → active</span>
         </div>
       </div>
 

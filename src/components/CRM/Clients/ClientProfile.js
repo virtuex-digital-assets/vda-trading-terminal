@@ -125,7 +125,15 @@ const ClientProfile = () => {
               </div>
               <div className="cp-kv">
                 <span className="cp-kv-label">Assigned To</span>
-                <span className="cp-kv-val">{client.assignedTo}</span>
+                <select
+                  className="cp-stage-select"
+                  value={client.assignedTo}
+                  onChange={(e) => dispatch(crmUpdateClient(client.id, { assignedTo: e.target.value }))}
+                >
+                  {['Alice K.', 'Bob T.', 'Carol M.'].map((rep) => (
+                    <option key={rep} value={rep}>{rep}</option>
+                  ))}
+                </select>
               </div>
             </div>
 

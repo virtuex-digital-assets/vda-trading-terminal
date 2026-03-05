@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { crmSelectClient, crmSetSearch, crmSetStageFilter, crmAddClient } from '../../../store/actions';
+import { crmSelectClient, crmSetSearch, crmSetStageFilter, crmAddClient, crmDeleteClient, crmSetRepFilter } from '../../../store/actions';
+import ClientProfile from './ClientProfile';
 import './ClientList.css';
 
 const STAGES_FILTER = ['All', 'New Lead', 'Contacted', 'KYC Submitted', 'KYC Verified', 'Funded', 'Active', 'Inactive'];
@@ -13,7 +14,7 @@ const kycBadgeClass = (kyc) =>
 
 const ClientList = () => {
   const dispatch = useDispatch();
-  const { clients, searchQuery, stageFilter, selectedClientId } = useSelector((s) => s.crm);
+  const { clients, searchQuery, stageFilter, repFilter, selectedClientId } = useSelector((s) => s.crm);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newClient, setNewClient] = useState({
@@ -23,6 +24,7 @@ const ClientList = () => {
   // ── Filter & search ──
   const filtered = clients.filter((c) => {
     const matchStage = stageFilter === 'All' || c.stage === stageFilter;
+    const matchRep   = repFilter === 'All' || c.assignedTo === repFilter;
     const q = searchQuery.toLowerCase();
     const matchSearch =
       !q ||
@@ -30,7 +32,7 @@ const ClientList = () => {
       c.email.toLowerCase().includes(q) ||
       c.country.toLowerCase().includes(q) ||
       c.id.toLowerCase().includes(q);
-    return matchStage && matchSearch;
+    return matchStage && matchRep && matchSearch;
   });
 
   const handleAddSubmit = (e) => {
@@ -43,8 +45,6 @@ const ClientList = () => {
 
   // ── If a client is selected, show the profile ──
   if (selectedClientId) {
-    // Dynamic import via require to avoid circular dep issues with CSS
-    const ClientProfile = require('./ClientProfile').default;
     return <ClientProfile />;
   }
 
@@ -86,12 +86,13 @@ const ClientList = () => {
               <th>Balance</th>
               <th>Assigned</th>
               <th>Last Activity</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="cl-empty">No clients match the current filter.</td>
+                <td colSpan={10} className="cl-empty">No clients match the current filter.</td>
               </tr>
             ) : (
               filtered.map((c) => (
@@ -112,6 +113,20 @@ const ClientList = () => {
                   <td style={{ color: '#5566aa' }}>{c.assignedTo}</td>
                   <td style={{ color: '#5566aa' }}>
                     {new Date(c.lastActivity).toLocaleDateString()}
+                  </td>
+                  <td>
+                    <button
+                      className="cl-delete-btn"
+                      title="Delete client"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Delete ${c.firstName} ${c.lastName}?`)) {
+                          dispatch(crmDeleteClient(c.id));
+                        }
+                      }}
+                    >
+                      ✕
+                    </button>
                   </td>
                 </tr>
               ))

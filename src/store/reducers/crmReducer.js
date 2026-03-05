@@ -7,6 +7,8 @@ import {
   CRM_SET_STAGE_FILTER,
   CRM_ADD_NOTE,
   CRM_ADD_TRANSACTION,
+  CRM_DELETE_CLIENT,
+  CRM_SET_REP_FILTER,
 } from '../actions/actionTypes';
 
 // ── Seed data ──────────────────────────────────────────────────────────────
@@ -178,6 +180,7 @@ const initialState = {
   clients: SEED_CLIENTS,
   searchQuery: '',
   stageFilter: 'All',
+  repFilter: 'All',          // 'All' | 'Alice K.' | 'Bob T.' | 'Carol M.'
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -199,6 +202,16 @@ const crmReducer = (state = initialState, action) => {
 
     case CRM_SET_STAGE_FILTER:
       return { ...state, stageFilter: action.payload };
+
+    case CRM_SET_REP_FILTER:
+      return { ...state, repFilter: action.payload };
+
+    case CRM_DELETE_CLIENT:
+      return {
+        ...state,
+        clients: state.clients.filter((c) => c.id !== action.payload),
+        selectedClientId: state.selectedClientId === action.payload ? null : state.selectedClientId,
+      };
 
     case CRM_ADD_CLIENT: {
       const id = `CLT${String(nextClientNum++).padStart(3, '0')}`;

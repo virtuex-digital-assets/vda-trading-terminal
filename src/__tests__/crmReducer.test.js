@@ -8,6 +8,8 @@ import {
   CRM_SET_STAGE_FILTER,
   CRM_ADD_NOTE,
   CRM_ADD_TRANSACTION,
+  CRM_DELETE_CLIENT,
+  CRM_SET_REP_FILTER,
 } from '../store/actions/actionTypes';
 
 describe('crmReducer', () => {
@@ -20,6 +22,7 @@ describe('crmReducer', () => {
     expect(initial.clients.length).toBeGreaterThan(0);
     expect(initial.searchQuery).toBe('');
     expect(initial.stageFilter).toBe('All');
+    expect(initial.repFilter).toBe('All');
   });
 
   it('handles CRM_SET_VIEW', () => {
@@ -144,6 +147,29 @@ describe('crmReducer', () => {
   it('does not mutate state on unknown action', () => {
     const state = crmReducer(initial, { type: '@@UNKNOWN' });
     expect(state).toBe(initial);
+  });
+
+  it('handles CRM_SET_REP_FILTER', () => {
+    const state = crmReducer(initial, { type: CRM_SET_REP_FILTER, payload: 'Alice K.' });
+    expect(state.repFilter).toBe('Alice K.');
+  });
+
+  it('handles CRM_DELETE_CLIENT', () => {
+    const state = crmReducer(initial, { type: CRM_DELETE_CLIENT, payload: 'CLT001' });
+    expect(state.clients.find((c) => c.id === 'CLT001')).toBeUndefined();
+    expect(state.clients.length).toBe(initial.clients.length - 1);
+  });
+
+  it('CRM_DELETE_CLIENT clears selectedClientId when deleting selected client', () => {
+    const withSelected = { ...initial, selectedClientId: 'CLT001' };
+    const state = crmReducer(withSelected, { type: CRM_DELETE_CLIENT, payload: 'CLT001' });
+    expect(state.selectedClientId).toBeNull();
+  });
+
+  it('CRM_DELETE_CLIENT preserves selectedClientId when deleting a different client', () => {
+    const withSelected = { ...initial, selectedClientId: 'CLT002' };
+    const state = crmReducer(withSelected, { type: CRM_DELETE_CLIENT, payload: 'CLT001' });
+    expect(state.selectedClientId).toBe('CLT002');
   });
 
   it('seed data contains expected client ids', () => {

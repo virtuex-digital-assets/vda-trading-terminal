@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { crmSetView } from '../../store/actions';
+import { crmSetView, crmSetRepFilter, crmSetStageFilter } from '../../store/actions';
 import CRMDashboard from './Dashboard/CRMDashboard';
 import ClientList from './Clients/ClientList';
 import Pipeline from './Pipeline/Pipeline';
@@ -14,9 +14,18 @@ const NAV_ITEMS = [
 
 const CRMView = () => {
   const dispatch = useDispatch();
-  const { activeView, clients } = useSelector((s) => s.crm);
+  const { activeView, clients, repFilter } = useSelector((s) => s.crm);
 
   const activeCount = clients.filter((c) => c.stage === 'Active').length;
+
+  const REPS = ['Alice K.', 'Bob T.', 'Carol M.'];
+
+  const handleRepClick = (rep) => {
+    const next = repFilter === rep ? 'All' : rep;
+    dispatch(crmSetRepFilter(next));
+    dispatch(crmSetStageFilter('All'));
+    dispatch(crmSetView('clients'));
+  };
 
   return (
     <div className="crm-root">
@@ -49,11 +58,24 @@ const CRMView = () => {
           <div style={{ padding: '6px 16px', fontSize: 10, color: '#3a4a6a' }}>
             ASSIGNED TO
           </div>
-          {['Alice K.', 'Bob T.', 'Carol M.'].map((rep) => (
-            <div key={rep} style={{ padding: '4px 16px', fontSize: 12, color: '#5566aa' }}>
-              • {rep}
-            </div>
-          ))}
+          {REPS.map((rep) => {
+            const count = clients.filter((c) => c.assignedTo === rep).length;
+            const isActive = repFilter === rep;
+            return (
+              <button
+                key={rep}
+                className={`crm-nav-item${isActive ? ' active' : ''}`}
+                style={{ fontSize: 12, paddingLeft: 20 }}
+                onClick={() => handleRepClick(rep)}
+              >
+                <span className="crm-nav-icon" style={{ fontSize: 11 }}>👤</span>
+                {rep}
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: isActive ? '#4fc3f7' : '#3a4a6a' }}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </nav>
 
         {/* ── Main content ────────────────────────────── */}
