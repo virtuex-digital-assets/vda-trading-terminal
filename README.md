@@ -234,55 +234,119 @@ Your trading terminal will load on your very own web address! 🎉
 
 ---
 
-## 🆕 How to create a new GitHub repository
+## 🆕 CRM System — standalone repository
 
-Want to create a brand-new repository on GitHub (for example, to keep a separate project like a CRM system)? Here's exactly how — step by step.
+The CRM module that lives inside this trading terminal has its own dedicated repository:
 
----
+> 👉 **[https://github.com/virtuex-digital-assets/vda-crm-system](https://github.com/virtuex-digital-assets/vda-crm-system)**
 
-### Step 1 — Sign in to GitHub
+Once deployed, the standalone CRM will be live at:
 
-Go to 👉 **[https://github.com](https://github.com)** and sign in to your account.
-
----
-
-### Step 2 — Click the "+" button
-
-In the top-right corner of any GitHub page you'll see a **"+"** icon.  
-Click it, then click **"New repository"**.
+> 👉 **[https://virtuex-digital-assets.github.io/vda-crm-system](https://virtuex-digital-assets.github.io/vda-crm-system)**
 
 ---
 
-### Step 3 — Fill in the details
+### How to copy the CRM code into the new repo
 
-| Field | What to type |
+The CRM source files live in this repo. Follow these steps **once** to push them into `vda-crm-system`.
+
+> ⚠️ You need **Node.js** and **Git** installed before starting (see the steps earlier in this README).
+
+---
+
+#### Step 1 — Clone the new CRM repo
+
+Open your terminal and type:
+
+```
+git clone https://github.com/virtuex-digital-assets/vda-crm-system.git
+cd vda-crm-system
+```
+
+---
+
+#### Step 2 — Bootstrap a React app in that folder
+
+```
+npx create-react-app .
+```
+
+⏳ This takes about 2 minutes. When it's done you'll see "Happy hacking!"
+
+---
+
+#### Step 3 — Copy the CRM source files across
+
+From the `vda-trading-terminal` folder, copy these into the new repo:
+
+| Copy this from `vda-trading-terminal/` | Into `vda-crm-system/` |
 |---|---|
-| **Repository name** | A short name with no spaces (e.g. `vda-crm-system`) |
-| **Description** | Optional — a one-line summary of what the project is |
-| **Public / Private** | Choose **Public** if you want it live on GitHub Pages for free |
-| **Add a README** | Tick this box — it creates the repo with a starter file |
+| `src/components/CRM/` | `src/components/CRM/` |
+| `src/components/shared.css` | `src/components/shared.css` |
+| `src/store/` | `src/store/` |
+
+Then replace `vda-crm-system/src/App.js` with:
+
+```jsx
+import React from 'react';
+import { Provider } from 'react-redux';
+import store from './store';
+import CRMView from './components/CRM/CRMView';
+import './components/shared.css';
+
+const App = () => (
+  <Provider store={store}>
+    <div style={{ background: '#0d1b2a', minHeight: '100vh' }}>
+      <header style={{ padding: '10px 20px', background: '#0a1628', color: '#c0cfe8', fontSize: 18, fontWeight: 700 }}>
+        VDA CRM System
+      </header>
+      <CRMView />
+    </div>
+  </Provider>
+);
+
+export default App;
+```
 
 ---
 
-### Step 4 — Click "Create repository"
+#### Step 4 — Install the extra packages
 
-That's it! GitHub creates the new repo and takes you straight to it. 🎉
-
----
-
-### Step 5 — (Optional) Make it go live with GitHub Pages
-
-If you want the new repo to have a live website (just like this one), repeat the steps in the **"Make it live online"** section above — but use your new repo's name in the URL.
-
-For example, a repo called `vda-crm-system` would go live at:
-
-> 👉 **`https://virtuex-digital-assets.github.io/vda-crm-system`**
+```
+npm install redux react-redux
+```
 
 ---
 
-### Step 6 — (Optional) Use GitHub Copilot to build the app
+#### Step 5 — Test it locally
 
-Once the empty repo exists, you can open a **Copilot** conversation pointed at the new repo and ask it to scaffold a complete app (e.g. a CRM system). Copilot will build, test, and deploy it for you automatically.
+```
+npm start
+```
+
+Open **[http://localhost:3000](http://localhost:3000)** — the CRM should load.
+
+---
+
+#### Step 6 — Commit and push to GitHub
+
+```
+git add .
+git commit -m "feat: add standalone CRM app"
+git push
+```
+
+---
+
+#### Step 7 — Enable GitHub Pages (make it live)
+
+1. Go to 👉 **[https://github.com/virtuex-digital-assets/vda-crm-system/settings/pages](https://github.com/virtuex-digital-assets/vda-crm-system/settings/pages)**
+2. Under **Source**, choose **GitHub Actions**
+3. Click **Save**
+
+GitHub will automatically build and deploy the CRM — it will be live in about 2 minutes at:
+
+> 👉 **[https://virtuex-digital-assets.github.io/vda-crm-system](https://virtuex-digital-assets.github.io/vda-crm-system)**
 
 ---
 
