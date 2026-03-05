@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - copilot/investigate-conversation-issues
   workflow_dispatch:
 
 permissions:
