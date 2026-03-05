@@ -234,6 +234,58 @@ Your trading terminal will load on your very own web address! 🎉
 
 ---
 
+## 🆕 How to create a new GitHub repository
+
+Want to create a brand-new repository on GitHub (for example, to keep a separate project like a CRM system)? Here's exactly how — step by step.
+
+---
+
+### Step 1 — Sign in to GitHub
+
+Go to 👉 **[https://github.com](https://github.com)** and sign in to your account.
+
+---
+
+### Step 2 — Click the "+" button
+
+In the top-right corner of any GitHub page you'll see a **"+"** icon.  
+Click it, then click **"New repository"**.
+
+---
+
+### Step 3 — Fill in the details
+
+| Field | What to type |
+|---|---|
+| **Repository name** | A short name with no spaces (e.g. `vda-crm-system`) |
+| **Description** | Optional — a one-line summary of what the project is |
+| **Public / Private** | Choose **Public** if you want it live on GitHub Pages for free |
+| **Add a README** | Tick this box — it creates the repo with a starter file |
+
+---
+
+### Step 4 — Click "Create repository"
+
+That's it! GitHub creates the new repo and takes you straight to it. 🎉
+
+---
+
+### Step 5 — (Optional) Make it go live with GitHub Pages
+
+If you want the new repo to have a live website (just like this one), repeat the steps in the **"Make it live online"** section above — but use your new repo's name in the URL.
+
+For example, a repo called `vda-crm-system` would go live at:
+
+> 👉 **`https://virtuex-digital-assets.github.io/vda-crm-system`**
+
+---
+
+### Step 6 — (Optional) Use GitHub Copilot to build the app
+
+Once the empty repo exists, you can open a **Copilot** conversation pointed at the new repo and ask it to scaffold a complete app (e.g. a CRM system). Copilot will build, test, and deploy it for you automatically.
+
+---
+
 ## 🤔 What can I do in the app?
 
 Here's what you'll see when you open it:
