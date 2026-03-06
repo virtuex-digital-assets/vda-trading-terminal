@@ -2,7 +2,11 @@
 
 This is a **trading app** that runs in your web browser. It shows live prices and lets you practice buying and selling currencies and other assets. 📈
 
-![VDA Trading Terminal](https://github.com/user-attachments/assets/a222cdf7-c337-47be-94c9-011c123b3a3f)
+---
+
+> ### 🚀 Ready to put it online?
+> **[➡ DEPLOY.md — Step-by-step go-live guide (plain English)](./DEPLOY.md)**
+> *(Or run `./go-live.sh` to check your setup and get the exact steps printed for you!)*
 
 ---
 
@@ -105,6 +109,8 @@ That turns off the app.
 ---
 
 ## 🌐 Make it live online (so anyone in the world can visit it)
+
+📖 **[Full step-by-step guide → DEPLOY.md](./DEPLOY.md)**  *(also try `./go-live.sh` for a guided checklist!)*
 
 The app is already set up to go live for **free** using something called **GitHub Pages**. Think of it like GitHub hosting your website for you. You just need to flip one switch — here's how:
 
