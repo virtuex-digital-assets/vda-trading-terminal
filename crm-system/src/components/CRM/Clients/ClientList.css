@@ -59,6 +59,32 @@
 
 .cl-add-btn:hover { background: #16408a; color: #e0f4ff; }
 
+.cl-export-btn {
+  background: #0f2a1a;
+  border: 1px solid #2a6a3a;
+  color: #66bb6a;
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cl-export-btn:hover { background: #1a4a2a; color: #a5d6a7; }
+
+.cl-import-btn {
+  background: #2a1a0a;
+  border: 1px solid #6a4a1a;
+  color: #ffa726;
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cl-import-btn:hover { background: #3a2a0a; color: #ffcc80; }
+
 /* ── Table ────────────────────────────────────────────────────────────────── */
 
 .cl-table-wrap {
