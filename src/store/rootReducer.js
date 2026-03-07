@@ -4,6 +4,7 @@ import ordersReducer from './reducers/ordersReducer';
 import accountReducer from './reducers/accountReducer';
 import connectionReducer from './reducers/connectionReducer';
 import terminalReducer from './reducers/terminalReducer';
+import crmReducer from './reducers/crmReducer';
 
 const rootReducer = combineReducers({
   market: marketReducer,
@@ -11,6 +12,7 @@ const rootReducer = combineReducers({
   account: accountReducer,
   connection: connectionReducer,
   terminal: terminalReducer,
+  crm: crmReducer,
 });
 
 export default rootReducer;

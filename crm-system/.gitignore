@@ -1,10 +1,8 @@
 # Dependencies
 node_modules/
-crm-system/node_modules/
 
 # Production build artifacts
 build/
-crm-system/build/
 
 # Environment variables
 .env.local
