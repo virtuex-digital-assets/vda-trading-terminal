@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { crmSelectClient, crmSetSearch, crmSetStageFilter, crmAddClient, crmDeleteClient, crmSetRepFilter } from '../../../store/actions';
+import { crmSelectClient, crmSetSearch, crmSetStageFilter, crmAddClient, crmDeleteClient, crmSetRepFilter, crmImportClients } from '../../../store/actions';
 import ClientProfile from './ClientProfile';
 import './ClientList.css';
 
@@ -20,6 +20,36 @@ const ClientList = () => {
   const [newClient, setNewClient] = useState({
     firstName: '', lastName: '', email: '', phone: '', country: '', assignedTo: 'Alice K.',
   });
+  const importInputRef = useRef(null);
+
+  const handleExport = () => {
+    const json = JSON.stringify(clients, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `crm-clients-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const list = Array.isArray(data) ? data : data.clients;
+        if (!Array.isArray(list)) { alert('Invalid CRM JSON: expected an array of clients or an object with a "clients" property.'); return; }
+        dispatch(crmImportClients(list));
+      } catch (err) {
+        alert('Failed to parse JSON file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   // ── Filter & search ──
   const filtered = clients.filter((c) => {
@@ -69,6 +99,19 @@ const ClientList = () => {
         </select>
         <button className="cl-add-btn" onClick={() => setShowAddModal(true)}>
           + Add Client
+        </button>
+        <button className="cl-export-btn" onClick={handleExport} title="Export all clients as JSON">
+          ↓ Export JSON
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: 'none' }}
+          onChange={handleImport}
+        />
+        <button className="cl-import-btn" onClick={() => importInputRef.current && importInputRef.current.click()} title="Import clients from JSON file">
+          ↑ Import JSON
         </button>
       </div>
 

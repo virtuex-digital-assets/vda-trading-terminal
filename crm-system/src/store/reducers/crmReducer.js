@@ -9,6 +9,7 @@ import {
   CRM_ADD_TRANSACTION,
   CRM_DELETE_CLIENT,
   CRM_SET_REP_FILTER,
+  CRM_IMPORT_CLIENTS,
 } from '../actions/actionTypes';
 
 // ── Seed data ──────────────────────────────────────────────────────────────
@@ -293,6 +294,18 @@ const crmReducer = (state = initialState, action) => {
           };
         }),
       };
+
+    case CRM_IMPORT_CLIENTS: {
+      const incoming = Array.isArray(action.payload) ? action.payload : [];
+      const incomingById = {};
+      incoming.forEach((c) => { if (c && c.id) incomingById[c.id] = c; });
+      const merged = state.clients.map((c) =>
+        incomingById[c.id] ? { ...c, ...incomingById[c.id] } : c
+      );
+      const existingIds = new Set(state.clients.map((c) => c.id));
+      incoming.forEach((c) => { if (c && c.id && !existingIds.has(c.id)) merged.push(c); });
+      return { ...state, clients: merged };
+    }
 
     default:
       return state;

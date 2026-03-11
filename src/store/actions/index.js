@@ -23,6 +23,7 @@ import {
   CRM_ADD_TRANSACTION,
   CRM_DELETE_CLIENT,
   CRM_SET_REP_FILTER,
+  CRM_IMPORT_CLIENTS,
 } from './actionTypes';
 
 // ── Market data actions ────────────────────────────────────────────────────
@@ -109,3 +110,4 @@ export const crmAddNote = (clientId, text, author) => ({ type: CRM_ADD_NOTE, pay
 export const crmAddTransaction = (clientId, txType, amount) => ({ type: CRM_ADD_TRANSACTION, payload: { clientId, txType, amount } });
 export const crmDeleteClient = (id) => ({ type: CRM_DELETE_CLIENT, payload: id });
 export const crmSetRepFilter = (rep) => ({ type: CRM_SET_REP_FILTER, payload: rep });
+export const crmImportClients = (clients) => ({ type: CRM_IMPORT_CLIENTS, payload: clients });

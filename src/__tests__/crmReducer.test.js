@@ -10,6 +10,7 @@ import {
   CRM_ADD_TRANSACTION,
   CRM_DELETE_CLIENT,
   CRM_SET_REP_FILTER,
+  CRM_IMPORT_CLIENTS,
 } from '../store/actions/actionTypes';
 
 describe('crmReducer', () => {
@@ -182,5 +183,40 @@ describe('crmReducer', () => {
     const active = initial.clients.filter((c) => c.stage === 'Active');
     expect(active.length).toBeGreaterThan(0);
     active.forEach((c) => expect(c.totalDeposits).toBeGreaterThan(0));
+  });
+
+  describe('CRM_IMPORT_CLIENTS', () => {
+    it('adds new clients not already present', () => {
+      const newClient = {
+        id: 'CLT099', firstName: 'Test', lastName: 'User',
+        email: 'test@example.com', phone: '', country: 'US',
+        stage: 'New Lead', kycStatus: 'pending',
+        balance: 0, totalDeposits: 0, totalWithdrawals: 0, openPL: 0,
+        accounts: [], assignedTo: 'Alice K.',
+        createdAt: '2026-01-01T00:00:00Z', lastActivity: '2026-01-01T00:00:00Z',
+        notes: [], transactions: [],
+      };
+      const state = crmReducer(initial, { type: CRM_IMPORT_CLIENTS, payload: [newClient] });
+      expect(state.clients.find((c) => c.id === 'CLT099')).toBeDefined();
+      expect(state.clients.length).toBe(initial.clients.length + 1);
+    });
+
+    it('updates existing clients by id', () => {
+      const updated = { id: 'CLT001', firstName: 'Updated', lastName: 'Name' };
+      const state = crmReducer(initial, { type: CRM_IMPORT_CLIENTS, payload: [updated] });
+      const client = state.clients.find((c) => c.id === 'CLT001');
+      expect(client.firstName).toBe('Updated');
+      expect(state.clients.length).toBe(initial.clients.length);
+    });
+
+    it('ignores entries without an id', () => {
+      const state = crmReducer(initial, { type: CRM_IMPORT_CLIENTS, payload: [{ firstName: 'No ID' }] });
+      expect(state.clients.length).toBe(initial.clients.length);
+    });
+
+    it('handles non-array payload gracefully', () => {
+      const state = crmReducer(initial, { type: CRM_IMPORT_CLIENTS, payload: null });
+      expect(state.clients.length).toBe(initial.clients.length);
+    });
   });
 });
