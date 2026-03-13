@@ -1,3 +1,17 @@
+// Action types
+export const PLACE_ORDER    = 'PLACE_ORDER';
+export const UPDATE_PRICES  = 'UPDATE_PRICES';
+export const SET_MARKET_ERROR = 'SET_MARKET_ERROR';
+export const SET_MARKET_LOADING = 'SET_MARKET_LOADING';
+
+// Action creators
+export const placeOrder = (order) => ({ type: PLACE_ORDER, payload: order });
+
+export const updatePrices = (prices) => ({ type: UPDATE_PRICES, payload: prices });
+
+export const setMarketError = (error) => ({ type: SET_MARKET_ERROR, payload: error });
+
+export const setMarketLoading = (loading) => ({ type: SET_MARKET_LOADING, payload: loading });
 import {
   UPDATE_QUOTE,
   SET_ACTIVE_SYMBOL,
@@ -119,6 +133,43 @@ export const setOrders = (open, pending, history) => ({
 
 /**
  * Add a single closed order to history (e.g. from a backend WebSocket event).
+// ── Backend order sync actions ────────────────────────────────────────────
+/** Replace all orders from the backend (used after login or full refresh). */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: { open, pending, history },
+});
+
+/** Add a single closed order to history (e.g. from WS broadcast). */
+/**
+ * Bulk-replace the orders state from the backend (used on login / reconnect).
+ * @param {{ open: object[], pending: object[], history: object[] }} orders
+ */
+export const setOrders = (orders) => ({
+  type: SET_ORDERS,
+  payload: orders,
+});
+
+/**
+ * Prepend a single closed order to trade history (used after REST close).
+ * @param {object} order
+ * Replace all orders in the store with data loaded from the backend.
+ * @param {object[]} [open]     Open market orders
+ * @param {object[]} [pending]  Pending limit/stop orders
+ * @param {object[]} [history]  Closed trade history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: {
+    ...(open    !== undefined && { open }),
+    ...(pending !== undefined && { pending }),
+    ...(history !== undefined && { history }),
+  },
+});
+
+/**
+ * Prepend a single closed order to the history array (deduplicates by ticket).
+ * @param {object} order  Closed order object from the backend
  */
 export const addHistoryOrder = (order) => ({
   type: ADD_HISTORY_ORDER,

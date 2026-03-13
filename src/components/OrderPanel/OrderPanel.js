@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
+import backendBridge from '../../services/backendBridge';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
 import backendBridge from '../../services/backendBridge';
@@ -22,6 +23,7 @@ const OrderPanel = () => {
   const [price, setPrice] = useState('');
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const quote = quotes[activeSymbol] || {};
   const isMarket = orderType === 'BUY' || orderType === 'SELL';
@@ -77,6 +79,27 @@ const OrderPanel = () => {
         setComment('');
       } catch (err) {
         dispatch(addLog('error', `Order rejected: ${err.message}`));
+    setSubmitError('');
+    setSubmitting(true);
+
+    if (backendBridge.isConfigured()) {
+      // ── Live backend mode ───────────────────────────────────────────────
+      try {
+        const placed = await backendBridge.placeOrder(order);
+        // Dispatch with server-assigned ticket so UI reflects backend state
+        dispatch(placeOrder(placed));
+        dispatch(
+          addLog(
+            'info',
+            `Order placed: ${placed.type} ${placed.lots} ${placed.symbol} @ ${formatPrice(placed.symbol, placed.openPrice)} #${placed.ticket}`
+          )
+        );
+        setPrice('');
+        setComment('');
+      } catch (err) {
+        const msg = `Order rejected: ${err.message}`;
+        setSubmitError(msg);
+        dispatch(addLog('error', msg));
       } finally {
         setSubmitting(false);
       }
@@ -87,6 +110,34 @@ const OrderPanel = () => {
       setPrice('');
       setComment('');
     }
+      // ── Demo / simulator mode ────────────────────────────────────────────
+    if (backendBridge.isConfigured()) {
+      // Live backend: REST API creates the order and assigns a server ticket.
+      backendBridge.placeOrder(order);
+    } else {
+      dispatch(placeOrder(order));
+      // Note: account margin is recalculated automatically on each simulator tick
+      try {
+        await backendBridge.placeOrder(order);
+      } catch (err) {
+        dispatch(addLog('error', `Order failed: ${err.message}`));
+        return;
+      }
+    } else {
+      dispatch(placeOrder(order));
+      dispatch(
+        addLog(
+          'info',
+          `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
+        )
+      );
+      setPrice('');
+      setComment('');
+      setSubmitting(false);
+    }
+    }
+    setPrice('');
+    setComment('');
   };
 
   return (
@@ -207,20 +258,29 @@ const OrderPanel = () => {
             className={btnClass('buy')}
             onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
             disabled={btnDisabled}
+            className={`op-btn buy${(!canTrade || submitting) ? ' disabled' : ''}`}
+            onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
+            disabled={!canTrade || submitting}
           >
-            ▲ BUY
+            {submitting ? '…' : '▲ BUY'}
           </button>
           <button
             className={btnClass('sell')}
             onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
             disabled={btnDisabled}
+            className={`op-btn sell${(!canTrade || submitting) ? ' disabled' : ''}`}
+            onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
+            disabled={!canTrade || submitting}
           >
-            ▼ SELL
+            {submitting ? '…' : '▼ SELL'}
           </button>
         </div>
         {submitting && <div className="op-warn">Sending order…</div>}
         {!canTrade && !submitting && openPrice > 0 && (
           <div className="op-warn">Insufficient margin</div>
+        )}
+        {submitError && (
+          <div className="op-warn">{submitError}</div>
         )}
       </div>
     </div>

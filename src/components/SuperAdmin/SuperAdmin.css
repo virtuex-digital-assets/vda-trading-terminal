@@ -292,3 +292,27 @@
   color: #4050a0;
   font-style: italic;
 }
+
+/* ── Embedded sub-view wrapper ──────────────────────────────────────────────── */
+.sa-embed-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sa-embed-view > * {
+  flex: 1;
+  min-height: 0;
+}
+/* Audit log */
+.sa-audit-table { font-size: 11px; }
+.sa-ml { margin-left: 8px; }
+.sa-row-error { background: rgba(200,50,50,0.08); }
+
+.sa-method { font-weight: 700; font-family: monospace; font-size: 10px; }
+.sa-method-post   { color: #50d0a0; }
+.sa-method-patch  { color: #ffd700; }
+.sa-method-delete { color: #ff6060; }
+.sa-method-get    { color: #7090d0; }
