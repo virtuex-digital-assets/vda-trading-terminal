@@ -149,6 +149,72 @@ function getAuditLog(req, res) {
   res.json(entries);
 }
 
+/**
+ * GET /api/admin/metrics
+ * System-wide performance and activity metrics.
+ */
+function getMetrics(req, res) {
+  const memUsage  = process.memoryUsage();
+  const uptime    = Math.floor(process.uptime());
+
+  const totalOrders   = db.openOrders.size + db.pendingOrders.size;
+  const closedOrders  = db.closedOrders.size;
+  const totalUsers    = db.users.size;
+  const totalAccounts = db.accounts.size;
+  const auditEntries  = db.auditLogs.length;
+
+  // Simple trading activity: count orders closed in the last 24h
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  let tradesLast24h = 0;
+  db.closedOrders.forEach((o) => {
+    if (new Date(o.closeTime).getTime() > oneDayAgo) tradesLast24h++;
+  });
+
+  // Aggregate P&L across all closed orders
+  let totalRealizedPnL = 0;
+  db.closedOrders.forEach((o) => { totalRealizedPnL += o.profit || 0; });
+
+  res.json({
+    system: {
+      uptime,
+      uptimeFormatted: formatUptime(uptime),
+      nodeVersion: process.version,
+      memoryMB: {
+        rss:      parseFloat((memUsage.rss / 1048576).toFixed(1)),
+        heapUsed: parseFloat((memUsage.heapUsed / 1048576).toFixed(1)),
+        heapTotal: parseFloat((memUsage.heapTotal / 1048576).toFixed(1)),
+      },
+    },
+    trading: {
+      openOrders:     db.openOrders.size,
+      pendingOrders:  db.pendingOrders.size,
+      totalActiveOrders: totalOrders,
+      closedOrders,
+      tradesLast24h,
+      totalRealizedPnL: parseFloat(totalRealizedPnL.toFixed(2)),
+    },
+    users: {
+      totalUsers,
+      totalAccounts,
+    },
+    audit: {
+      totalAuditEntries: auditEntries,
+    },
+    wallet: {
+      totalTransactions: db.walletTransactions.size,
+    },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
+
 module.exports = {
   getRisk,
   listAccounts,
@@ -159,4 +225,5 @@ module.exports = {
   createUser,
   setUserStatus,
   getAuditLog,
+  getMetrics,
 };

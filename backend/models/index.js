@@ -59,10 +59,60 @@ const symbolRegistry = new Map([
   ['ETHUSD', { symbol: 'ETHUSD', description: 'Ethereum / US Dollar',        spread: 0.5,    leverageCap: 10,  contractSize: 1,      pipSize: 0.01,   digits: 2, currency: 'USD', tradingHours: '00:00-24:00', active: false }],
 ]);
 
+// ── Wallet transactions ─────────────────────────────────────────────────────
+
+/**
+ * wallet transactions keyed by id.
+ * Each entry: { id, userId, type, amount, currency, status, reference, note, createdAt }
+ * type: 'deposit' | 'withdrawal'
+ * status: 'pending' | 'approved' | 'rejected' | 'completed'
+ */
+const walletTransactions = new Map();
+
+let txCounter = 1;
+function nextTxId() {
+  // Include a timestamp prefix so IDs remain unique across server restarts
+  const ts = Date.now().toString(36).toUpperCase();
+  return `TX${ts}${String(txCounter++).padStart(4, '0')}`;
+}
+
+function createWalletTransaction(userId, type, amount, currency = 'USD', note = '', reference = '') {
+  const id = nextTxId();
+  const tx = {
+    id,
+    userId,
+    type,           // 'deposit' | 'withdrawal'
+    amount: parseFloat(amount.toFixed(2)),
+    currency,
+    status: 'pending',
+    reference,
+    note,
+    createdAt: new Date().toISOString(),
+    processedAt: null,
+  };
+  walletTransactions.set(id, tx);
+  return tx;
+}
+
+function getWalletTransactionsByUserId(userId) {
+  return [...walletTransactions.values()]
+    .filter((tx) => tx.userId === userId)
+    .sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+}
+
 // ── Audit log ──────────────────────────────────────────────────────────────
 
 /** Array of audit log entries (capped at 1 000 by middleware). */
 const auditLogs = [];
+
+// ── 2FA secrets ─────────────────────────────────────────────────────────────
+
+/**
+ * Per-user TOTP secrets.  Stored separately from the user record so they
+ * are never accidentally serialised to API responses.
+ * userId → { secret (base32), enabled (bool), pendingSecret (base32)|null }
+ */
+const totpSecrets = new Map();
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -147,6 +197,8 @@ module.exports = {
   candles,
   symbolRegistry,
   auditLogs,
+  walletTransactions,
+  totpSecrets,
   nextTicket,
   getUserByEmail,
   getUserById,
@@ -154,4 +206,6 @@ module.exports = {
   getAccountById,
   createAccount,
   createUser,
+  createWalletTransaction,
+  getWalletTransactionsByUserId,
 };

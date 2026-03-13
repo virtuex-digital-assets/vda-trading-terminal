@@ -20,6 +20,16 @@ module.exports = {
   tickIntervalMs: parseInt(process.env.TICK_INTERVAL_MS || '500', 10),
   candleHistoryCount: parseInt(process.env.CANDLE_HISTORY_COUNT || '200', 10),
 
+  // Market data provider: 'simulator' (default) | 'external'
+  marketDataProvider: process.env.MARKET_DATA_PROVIDER || 'simulator',
+
+  // Trading engine
+  maxSlippageFactor: parseFloat(process.env.MAX_SLIPPAGE_FACTOR || '1.5'),
+
+  // Wallet limits (USD)
+  maxDepositAmount: parseFloat(process.env.MAX_DEPOSIT_AMOUNT || '1000000'),
+  maxWithdrawalAmount: parseFloat(process.env.MAX_WITHDRAWAL_AMOUNT || '500000'),
+
   // CORS – origins allowed to call the REST API
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),
 };

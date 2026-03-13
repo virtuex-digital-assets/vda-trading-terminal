@@ -75,7 +75,38 @@ function calcMACD(closes, fast = 12, slow = 26, signal = 9) {
   return { macdLine: macd, signalLine, histogram };
 }
 
-const INDICATORS = ['None', 'SMA 20', 'EMA 20', 'BB 20', 'MACD'];
+/** Relative Strength Index */
+function calcRSI(closes, period = 14) {
+  const result = Array(closes.length).fill(null);
+  if (closes.length < period + 1) return result;
+
+  let avgGain = 0;
+  let avgLoss = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i] - closes[i - 1];
+    if (diff > 0) avgGain += diff;
+    else avgLoss += Math.abs(diff);
+  }
+  avgGain /= period;
+  avgLoss /= period;
+
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  result[period] = parseFloat((100 - 100 / (1 + rs)).toFixed(2));
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? Math.abs(diff) : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    const rs2 = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    result[i] = parseFloat((100 - 100 / (1 + rs2)).toFixed(2));
+  }
+  return result;
+}
+
+const INDICATORS = ['None', 'SMA 20', 'EMA 20', 'BB 20', 'MACD', 'RSI 14'];
 
 const Chart = () => {
   const dispatch = useDispatch();
@@ -338,6 +369,56 @@ const Chart = () => {
         else    { ctx.moveTo(toX(vi), toMY(v)); ss = true; }
       });
       ctx.stroke();
+    } else if (indicator === 'RSI 14') {
+      // Draw RSI in a sub-panel below the candles
+      const rsiH   = Math.round(height * 0.22);
+      const rsiTop = height - rsiH;
+      ctx.fillStyle = '#12122a';
+      ctx.fillRect(0, rsiTop, width, rsiH);
+      ctx.strokeStyle = '#2a2a4a';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(0, rsiTop); ctx.lineTo(width, rsiTop); ctx.stroke();
+
+      const rsiVals = calcRSI(closes);
+      const toRY = (v) => rsiTop + rsiH - (v / 100) * rsiH;
+
+      // Overbought (70), midline (50), oversold (30)
+      [70, 50, 30].forEach((level) => {
+        ctx.strokeStyle = level === 50 ? '#334466' : '#443322';
+        ctx.lineWidth   = 0.8;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, toRY(level));
+        ctx.lineTo(width, toRY(level));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle  = '#7788bb';
+        ctx.font       = '8px monospace';
+        ctx.textAlign  = 'right';
+        ctx.fillText(String(level), width - padding.right - 2, toRY(level) + 3);
+      });
+
+      // RSI line
+      ctx.strokeStyle = '#ce93d8';
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      let sr = false;
+      visibleIdx.forEach((di, vi) => {
+        const v = rsiVals[di];
+        if (v === null || v === undefined) { sr = false; return; }
+        if (sr) { ctx.lineTo(toX(vi), toRY(v)); }
+        else    { ctx.moveTo(toX(vi), toRY(v)); sr = true; }
+      });
+      ctx.stroke();
+
+      // Current RSI value label
+      const lastRsi = rsiVals[visibleIdx[visibleIdx.length - 1]];
+      if (lastRsi !== null && lastRsi !== undefined) {
+        ctx.fillStyle  = '#ce93d8';
+        ctx.font       = 'bold 9px monospace';
+        ctx.textAlign  = 'left';
+        ctx.fillText(`RSI: ${lastRsi.toFixed(1)}`, padding.left + 4, rsiTop + 12);
+      }
     }
 
     // ── Current price line ────────────────────────────────────────────────

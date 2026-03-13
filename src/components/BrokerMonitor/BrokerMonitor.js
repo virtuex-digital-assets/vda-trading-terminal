@@ -8,13 +8,13 @@ import './BrokerMonitor.css';
  * BrokerMonitor – Admin / Broker risk monitoring dashboard.
  *
  * Aggregates all open positions across all accounts to show:
- *  • Symbol-level buy/sell exposure and net lots
- *  • Per-account equity snapshot
- *  • Total floating P&L
+ *  • Symbol-level buy/sell exposure and net lots (margin heatmap)
+ *  • Per-account equity snapshot with health score
+ *  • Accounts at liquidation risk
+ *  • Total floating P&L and platform-wide aggregates
  *
- * In standalone mode this reads from the Redux store (all positions are
- * single-account).  When connected to the backend the data is fetched from
- * the /api/admin/risk, /api/admin/accounts, and /api/admin/orders endpoints.
+ * In standalone mode this reads from the Redux store.
+ * When connected to the backend data is fetched from /api/admin/risk.
  */
 const BrokerMonitor = () => {
   const { openOrders: reduxOrders } = useSelector((s) => s.orders);

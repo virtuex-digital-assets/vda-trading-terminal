@@ -27,6 +27,7 @@ const orderRoutes   = require('./routes/orders');
 const accountRoutes = require('./routes/account');
 const symbolRoutes  = require('./routes/symbols');
 const adminRoutes   = require('./routes/admin');
+const walletRoutes  = require('./routes/wallet');
 
 // Middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -56,9 +57,18 @@ app.use('/api/orders',  orderRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/symbols', symbolRoutes);
 app.use('/api/admin',   adminRoutes);
+app.use('/api/wallet',  walletRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+app.get('/health', (_req, res) => {
+  const { providerName } = require('./services/marketDataProvider');
+  res.json({
+    status: 'ok',
+    ts: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    marketDataProvider: providerName(),
+  });
+});
 
 // ── 404 handler ────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
