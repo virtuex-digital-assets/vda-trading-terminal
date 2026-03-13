@@ -109,12 +109,12 @@ const SuperAdmin = () => {
           })));
         }
       })
-      .catch(() => {});
+      .catch((err) => { console.warn('[SuperAdmin] Failed to load symbols from backend:', err.message); });
 
     // Load users from backend (super_admin endpoint)
     backendBridge.getUsers()
       .then((users) => { if (Array.isArray(users)) setBackendUsers(users); })
-      .catch(() => {});
+      .catch((err) => { console.warn('[SuperAdmin] Failed to load users from backend:', err.message); });
   }, []); // eslint-disable-line
 
   // ── Refresh audit log when audit tab is opened ───────────────────────────
@@ -122,7 +122,7 @@ const SuperAdmin = () => {
     if (tab !== 'audit' || !backendBridge.isConfigured()) return;
     backendBridge.getAuditLog(200)
       .then((entries) => { if (Array.isArray(entries)) setAuditLog(entries); })
-      .catch(() => {});
+      .catch((err) => { console.warn('[SuperAdmin] Failed to load audit log:', err.message); });
   }, [tab]);
 
   // ── Flash message helper ─────────────────────────────────────────────────
@@ -231,7 +231,8 @@ const SuperAdmin = () => {
     );
     dispatch({ type: ADD_LOG, payload: `[ADMIN] Symbol ${sym} ${newActive ? 'enabled' : 'disabled'}` });
     if (backendBridge.isConfigured()) {
-      backendBridge.updateSymbol(sym, { active: newActive }).catch(() => {});
+      backendBridge.updateSymbol(sym, { active: newActive })
+        .catch((err) => flash(`Symbol update failed: ${err.message}`));
     }
   };
 
@@ -246,7 +247,10 @@ const SuperAdmin = () => {
   const handleSpreadBlur = (sym) => {
     if (!backendBridge.isConfigured()) return;
     const cur = symbols.find((s) => s.symbol === sym);
-    if (cur) backendBridge.updateSymbol(sym, { spread: cur.spread }).catch(() => {});
+    if (cur) {
+      backendBridge.updateSymbol(sym, { spread: cur.spread })
+        .catch((err) => flash(`Spread update failed: ${err.message}`));
+    }
   };
 
   const handleLevCapChange = (sym, value) => {
@@ -260,7 +264,10 @@ const SuperAdmin = () => {
   const handleLevCapBlur = (sym) => {
     if (!backendBridge.isConfigured()) return;
     const cur = symbols.find((s) => s.symbol === sym);
-    if (cur) backendBridge.updateSymbol(sym, { leverageCap: cur.leverageCap }).catch(() => {});
+    if (cur) {
+      backendBridge.updateSymbol(sym, { leverageCap: cur.leverageCap })
+        .catch((err) => flash(`Leverage update failed: ${err.message}`));
+    }
   };
 
   // ── Save settings ─────────────────────────────────────────────────────────

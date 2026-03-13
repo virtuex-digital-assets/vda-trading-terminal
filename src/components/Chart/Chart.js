@@ -322,7 +322,8 @@ const Chart = () => {
       visibleIdx.forEach((di, vi) => {
         const v = macdLine[di];
         if (v === null || v === undefined) { sm = false; return; }
-        sm ? ctx.lineTo(toX(vi), toMY(v)) : (ctx.moveTo(toX(vi), toMY(v)), (sm = true));
+        if (sm) { ctx.lineTo(toX(vi), toMY(v)); }
+        else    { ctx.moveTo(toX(vi), toMY(v)); sm = true; }
       });
       ctx.stroke();
 
@@ -333,7 +334,8 @@ const Chart = () => {
       visibleIdx.forEach((di, vi) => {
         const v = signalLine[di];
         if (v === null || v === undefined) { ss = false; return; }
-        ss ? ctx.lineTo(toX(vi), toMY(v)) : (ctx.moveTo(toX(vi), toMY(v)), (ss = true));
+        if (ss) { ctx.lineTo(toX(vi), toMY(v)); }
+        else    { ctx.moveTo(toX(vi), toMY(v)); ss = true; }
       });
       ctx.stroke();
     }

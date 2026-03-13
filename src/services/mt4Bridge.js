@@ -86,6 +86,16 @@ class MT4Bridge {
     }
   }
 
+  /**
+   * Subscribe to candle history for a symbol/timeframe via WebSocket.
+   * The backend will respond with a { type: 'candles', ... } message.
+   */
+  subscribeCandles(symbol, timeframe) {
+    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+      this._ws.send(JSON.stringify({ type: 'subscribe_candles', symbol, timeframe }));
+    }
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────
 
   _simulatorTick() {
@@ -227,7 +237,12 @@ class MT4Bridge {
 
     this._ws.onopen = () => {
       store.dispatch(setConnectionStatus({ status: 'connected', broker: url }));
-      store.dispatch(addLog('info', 'Connected to MT4 bridge'));
+      store.dispatch(addLog('info', 'Connected to VDA backend WebSocket'));
+      // Authenticate with JWT if available
+      const token = localStorage.getItem('vda_token');
+      if (token) {
+        this._ws.send(JSON.stringify({ type: 'auth', token }));
+      }
     };
 
     this._ws.onmessage = (evt) => {
@@ -255,6 +270,16 @@ class MT4Bridge {
 
   _handleBridgeMessage(msg) {
     switch (msg.type) {
+      case 'welcome':
+        store.dispatch(addLog('info', msg.message || 'WebSocket connected'));
+        break;
+      case 'auth_ok':
+        store.dispatch(setConnectionStatus({ status: 'connected', broker: msg.name || 'VDA Backend' }));
+        store.dispatch(addLog('info', `Authenticated as ${msg.role} — ${msg.name}`));
+        break;
+      case 'auth_error':
+        store.dispatch(addLog('error', `Auth error: ${msg.message}`));
+        break;
       case 'quote':
         store.dispatch(updateQuote(msg.symbol, msg.bid, msg.ask, msg.time));
         break;
@@ -262,10 +287,28 @@ class MT4Bridge {
         store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data));
         break;
       case 'candle':
-        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data));
+        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.candle || msg.data));
         break;
       case 'account':
-        store.dispatch(updateAccount(msg.data));
+        // Backend sends the full account object; map to frontend shape
+        store.dispatch(updateAccount({
+          balance:     msg.balance,
+          equity:      msg.equity,
+          margin:      msg.margin,
+          freeMargin:  msg.freeMargin,
+          marginLevel: msg.marginLevel,
+          profit:      msg.profit,
+          leverage:    msg.leverage,
+          login:       msg.login,
+          server:      msg.server,
+        }));
+        break;
+      case 'order':
+        // Order lifecycle events from backend
+        store.dispatch(addLog('debug', `Order event: ${msg.action} #${msg.order && msg.order.ticket}`));
+        break;
+      case 'risk':
+        // Broker risk data – handled by BrokerMonitor via Redux if needed
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));
