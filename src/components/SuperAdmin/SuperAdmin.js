@@ -137,7 +137,7 @@ const SuperAdmin = () => {
         .catch(() => {});
     };
     loadMetrics();
-    const metricsInterval = setInterval(loadMetrics, METRICS_REFRESH_INTERVAL); // eslint-disable-line react-hooks/exhaustive-deps
+    const metricsInterval = setInterval(loadMetrics, METRICS_REFRESH_INTERVAL);
     return () => clearInterval(metricsInterval);
   }, []); // eslint-disable-line
 
