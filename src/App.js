@@ -51,6 +51,17 @@ const AppInner = () => {
 
   // ── MT4 bridge ────────────────────────────────────────────────────────
   useEffect(() => {
+    if (backendBridge.isConfigured()) {
+      // Connect to backend WebSocket (market data + real-time updates).
+      // The simulator is NOT started when a live backend is configured.
+      backendBridge.connect();
+      return () => backendBridge.disconnect();
+    }
+    // Standalone / demo mode – use the built-in market simulator.
+    if (MT4_BRIDGE_URL) {
+      mt4Bridge.connect(MT4_BRIDGE_URL);
+    } else {
+      mt4Bridge.startSimulator();
     // Use the backend bridge for real-time data when the API is configured,
     // otherwise fall back to the built-in MT4 simulator.
     if (!backendBridge.isConfigured()) {
@@ -103,6 +114,13 @@ const AppInner = () => {
   const handleLogin = async (role, token) => {
     setUserRole(role);
     setShowLogin(false);
+    if (backendBridge.isConfigured()) {
+      // Re-authenticate the existing WS connection with the new JWT, then
+      // pull the latest account state and orders from the backend.
+      backendBridge.authenticate();
+      backendBridge.getAccount().catch(() => {});
+    }
+    }
 
     // When a real backend token is available, initialise the bridge.
     if (token && backendBridge.isConfigured()) {

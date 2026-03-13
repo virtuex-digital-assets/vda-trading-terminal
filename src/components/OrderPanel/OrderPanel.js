@@ -38,6 +38,8 @@ const OrderPanel = () => {
     : 0;
 
   const canTrade = freeMargin >= requiredMargin && openPrice > 0 && lots > 0;
+  const btnDisabled = !canTrade || submitting;
+  const btnClass = (side) => `op-btn ${side}${btnDisabled ? ' disabled' : ''}`;
 
   const submitOrder = async (type) => {
     const isBuyType = type.startsWith('BUY');
@@ -66,6 +68,17 @@ const OrderPanel = () => {
       comment,
     };
 
+    if (backendBridge.isConfigured()) {
+      setSubmitting(true);
+      try {
+        const confirmed = await backendBridge.placeOrder(order);
+        // Dispatch with the backend-assigned ticket so Redux state matches.
+        dispatch(placeOrder(confirmed));
+        dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
+        setPrice('');
+        setComment('');
+      } catch (err) {
+        dispatch(addLog('error', `Order rejected: ${err.message}`));
     setSubmitError('');
     setSubmitting(true);
 
@@ -91,6 +104,12 @@ const OrderPanel = () => {
         setSubmitting(false);
       }
     } else {
+      // Simulator / offline mode – dispatch directly to Redux.
+      dispatch(placeOrder(order));
+      dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
+      setPrice('');
+      setComment('');
+    }
       // ── Demo / simulator mode ────────────────────────────────────────────
     if (backendBridge.isConfigured()) {
       // Live backend: REST API creates the order and assigns a server ticket.
@@ -236,6 +255,9 @@ const OrderPanel = () => {
 
         <div className="op-actions">
           <button
+            className={btnClass('buy')}
+            onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
+            disabled={btnDisabled}
             className={`op-btn buy${(!canTrade || submitting) ? ' disabled' : ''}`}
             onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
             disabled={!canTrade || submitting}
@@ -243,6 +265,9 @@ const OrderPanel = () => {
             {submitting ? '…' : '▲ BUY'}
           </button>
           <button
+            className={btnClass('sell')}
+            onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
+            disabled={btnDisabled}
             className={`op-btn sell${(!canTrade || submitting) ? ' disabled' : ''}`}
             onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
             disabled={!canTrade || submitting}
@@ -250,7 +275,8 @@ const OrderPanel = () => {
             {submitting ? '…' : '▼ SELL'}
           </button>
         </div>
-        {!canTrade && openPrice > 0 && (
+        {submitting && <div className="op-warn">Sending order…</div>}
+        {!canTrade && !submitting && openPrice > 0 && (
           <div className="op-warn">Insufficient margin</div>
         )}
         {submitError && (

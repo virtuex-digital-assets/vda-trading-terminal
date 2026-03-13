@@ -120,6 +120,19 @@ export const cancelPendingOrder = (ticket) => ({
   payload: ticket,
 });
 
+/**
+ * Replace the entire orders state with data loaded from the backend.
+ * @param {object[]} open     - open market orders
+ * @param {object[]} pending  - pending limit/stop orders
+ * @param {object[]} history  - closed order history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: { open, pending, history },
+});
+
+/**
+ * Add a single closed order to history (e.g. from a backend WebSocket event).
 // ── Backend order sync actions ────────────────────────────────────────────
 /** Replace all orders from the backend (used after login or full refresh). */
 export const setOrders = (open, pending, history) => ({

@@ -16,6 +16,11 @@ const initialState = {
 const ordersReducer = (state = initialState, action) => {
   switch (action.type) {
     case PLACE_ORDER: {
+      // If the order already has a ticket (e.g. confirmed by backend) use it;
+      // otherwise generate a new one for simulator/optimistic mode.
+      const ticket = action.payload.ticket || ++ticketCounter;
+      const openTime = action.payload.openTime || new Date().toISOString();
+      const order = { ...action.payload, ticket, openTime, profit: action.payload.profit ?? 0 };
       const order = {
         ...action.payload,
         id: state.nextId,
@@ -95,6 +100,7 @@ const ordersReducer = (state = initialState, action) => {
     }
 
     case SET_ORDERS: {
+      const { open, pending, history } = action.payload;
     // ── Backend sync ──────────────────────────────────────────────────────
 
     case SET_ORDERS: {
@@ -104,6 +110,7 @@ const ordersReducer = (state = initialState, action) => {
     }
 
     case ADD_HISTORY_ORDER: {
+      return { ...state, history: [action.payload, ...state.history] };
       const order = action.payload;
       // Avoid duplicates by ticket number alone (closeTime may be absent)
       const exists = state.history.some((o) => o.ticket === order.ticket);
