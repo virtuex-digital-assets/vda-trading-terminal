@@ -94,6 +94,7 @@ describe('ordersReducer', () => {
     const s1 = ordersReducer(initial, { type: ADD_HISTORY_ORDER, payload: closed });
     const s2 = ordersReducer(s1, { type: ADD_HISTORY_ORDER, payload: closed });
     expect(s2.history).toHaveLength(1);
+  });
   it('handles PLACE_ORDER with server-assigned ticket (backend mode)', () => {
     const order = { symbol: 'EURUSD', type: 'BUY', lots: 0.1, openPrice: 1.085, ticket: 5001 };
     const state = ordersReducer(initial, { type: PLACE_ORDER, payload: order });

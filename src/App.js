@@ -1,28 +1,8 @@
-import React from 'react';
-import MarketData    from './components/MarketData';
-import Wallet        from './components/Wallet';
-import OrderForm     from './components/OrderForm';
-import OrderHistory  from './components/OrderHistory';
-
-const App = () => (
-  <div className="app">
-    <header className="app-header">
-      <h1>VDA Trading Terminal</h1>
-      <span className="subtitle">Virtual paper-trading · Powered by CoinGecko</span>
-    </header>
-    <main className="app-body">
-      <MarketData />
-      <Wallet />
-      <OrderForm />
-      <OrderHistory />
-    </main>
-  </div>
 import React, { useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
 import backendBridge from './services/backendBridge';
-import { updateAccount, setOrders, addLog } from './store/actions';
 
 import MarketWatch    from './components/MarketWatch/MarketWatch';
 import Chart          from './components/Chart/Chart';
@@ -51,17 +31,6 @@ const AppInner = () => {
 
   // ── MT4 bridge ────────────────────────────────────────────────────────
   useEffect(() => {
-    if (backendBridge.isConfigured()) {
-      // Connect to backend WebSocket (market data + real-time updates).
-      // The simulator is NOT started when a live backend is configured.
-      backendBridge.connect();
-      return () => backendBridge.disconnect();
-    }
-    // Standalone / demo mode – use the built-in market simulator.
-    if (MT4_BRIDGE_URL) {
-      mt4Bridge.connect(MT4_BRIDGE_URL);
-    } else {
-      mt4Bridge.startSimulator();
     // Use the backend bridge for real-time data when the API is configured,
     // otherwise fall back to the built-in MT4 simulator.
     if (!backendBridge.isConfigured()) {
@@ -74,7 +43,6 @@ const AppInner = () => {
     return () => mt4Bridge.disconnect();
   }, []);
 
-  const handleLogin = async (role) => {
   // ── Auto-login from stored JWT ────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('vda_token');
@@ -107,20 +75,11 @@ const AppInner = () => {
       if (user.role === 'super_admin') setAppMode('superadmin');
       else if (user.role === 'admin')  setAppMode('broker');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleLogin = (role) => {
   const handleLogin = async (role, token) => {
     setUserRole(role);
     setShowLogin(false);
-    if (backendBridge.isConfigured()) {
-      // Re-authenticate the existing WS connection with the new JWT, then
-      // pull the latest account state and orders from the backend.
-      backendBridge.authenticate();
-      backendBridge.getAccount().catch(() => {});
-    }
-    }
 
     // When a real backend token is available, initialise the bridge.
     if (token && backendBridge.isConfigured()) {
@@ -132,41 +91,6 @@ const AppInner = () => {
 
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin') setAppMode('broker');
-
-    // When a backend API is configured, load account + orders and authenticate WS
-    if (backendBridge.isConfigured()) {
-      const token = localStorage.getItem('vda_token');
-      if (token) {
-        backendBridge.setToken(token);
-        // Authenticate the existing WebSocket with the JWT
-        mt4Bridge.setAuthToken(token);
-        // Load initial account state from REST
-        try {
-          const account = await backendBridge.loadAccount();
-          store.dispatch(updateAccount(account));
-        } catch (err) {
-          store.dispatch(addLog('warn', `Could not load account: ${err.message}`));
-        }
-        // Load open/pending orders and history from REST
-        try {
-          const [ordersData, history] = await Promise.all([
-            backendBridge.loadOrders(),
-            backendBridge.loadHistory(),
-          ]);
-          store.dispatch(setOrders(
-            ordersData.open    || [],
-            ordersData.pending || [],
-            history            || [],
-          ));
-        } catch (err) {
-          store.dispatch(addLog('warn', `Could not load orders: ${err.message}`));
-        }
-      }
-    // When connected to the live backend, load account state and orders.
-    if (backendBridge.isConfigured()) {
-      backendBridge.loadAccount();
-      backendBridge.loadOrders();
-    }
   };
 
   const handleLogout = () => {

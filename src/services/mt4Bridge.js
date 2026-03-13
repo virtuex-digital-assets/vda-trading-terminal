@@ -18,15 +18,10 @@ import {
   updateOrderProfit,
   closeOrder,
   placeOrder,
-  modifyOrder,
-  setOrders,
-  addHistoryOrder,
-  cancelPendingOrder,
-  addHistoryOrder,
   setConnectionStatus,
   addLog,
 } from '../store/actions';
-
+import { CANCEL_PENDING_ORDER } from '../store/actions/actionTypes';
 import { generateSimulatedCandles, simulateNextCandle } from '../utils/marketSimulator';
 import { getSpread, calculateProfit, calculateMargin, getPricePrecision } from '../utils/constants';
 
@@ -39,31 +34,16 @@ class MT4Bridge {
     this._simulationInterval = null;
     this._useSimulator = true;
     this._bridgeUrl = null;
-    this._authToken = null;
   }
 
   /**
    * Connect to a live MT4 bridge WebSocket server.
    * @param {string} url  WebSocket URL, e.g. ws://localhost:5000
-   * @param {string} [token]  Optional JWT to authenticate on the backend WS.
    */
-  connect(url, token) {
+  connect(url) {
     this._bridgeUrl = url;
     this._useSimulator = false;
-    if (token) this._authToken = token;
     this._openSocket(url);
-  }
-
-  /**
-   * Update the JWT used to authenticate with the backend WebSocket.
-   * Call this after a successful login when the bridge is already connected.
-   * @param {string} token
-   */
-  setAuthToken(token) {
-    this._authToken = token;
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-      this._ws.send(JSON.stringify({ type: 'auth', token }));
-    }
   }
 
   /** Start the built-in demo simulator (no real MT4 required). */
@@ -103,16 +83,6 @@ class MT4Bridge {
     if (this._ws) {
       this._ws.close();
       this._ws = null;
-    }
-  }
-
-  /**
-   * Subscribe to candle history for a symbol/timeframe via WebSocket.
-   * The backend will respond with a { type: 'candles', ... } message.
-   */
-  subscribeCandles(symbol, timeframe) {
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-      this._ws.send(JSON.stringify({ type: 'subscribe_candles', symbol, timeframe }));
     }
   }
 
@@ -211,7 +181,7 @@ class MT4Bridge {
 
       if (triggered) {
         // Remove pending, place as market order
-        store.dispatch(cancelPendingOrder(order.ticket));
+        store.dispatch({ type: CANCEL_PENDING_ORDER, payload: order.ticket });
         const marketType = order.type.startsWith('BUY') ? 'BUY' : 'SELL';
         store.dispatch(placeOrder({
           ...order,
@@ -258,16 +228,6 @@ class MT4Bridge {
     this._ws.onopen = () => {
       store.dispatch(setConnectionStatus({ status: 'connected', broker: url }));
       store.dispatch(addLog('info', 'Connected to MT4 bridge'));
-      // Authenticate with the backend WebSocket if a token is available
-      if (this._authToken) {
-        this._ws.send(JSON.stringify({ type: 'auth', token: this._authToken }));
-      // Authenticate with the backend so it sends account-scoped updates.
-      store.dispatch(addLog('info', 'Connected to VDA backend WebSocket'));
-      // Authenticate with JWT if available
-      const token = localStorage.getItem('vda_token');
-      if (token) {
-        this._ws.send(JSON.stringify({ type: 'auth', token }));
-      }
     };
 
     this._ws.onmessage = (evt) => {
@@ -295,16 +255,6 @@ class MT4Bridge {
 
   _handleBridgeMessage(msg) {
     switch (msg.type) {
-      case 'welcome':
-        store.dispatch(addLog('info', msg.message || 'WebSocket connected'));
-        break;
-      case 'auth_ok':
-        store.dispatch(setConnectionStatus({ status: 'connected', broker: msg.name || 'VDA Backend' }));
-        store.dispatch(addLog('info', `Authenticated as ${msg.role} — ${msg.name}`));
-        break;
-      case 'auth_error':
-        store.dispatch(addLog('error', `Auth error: ${msg.message}`));
-        break;
       case 'quote':
         store.dispatch(updateQuote(msg.symbol, msg.bid, msg.ask, msg.time));
         break;
@@ -312,112 +262,13 @@ class MT4Bridge {
         store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data));
         break;
       case 'candle':
-        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data || msg.candle));
-        break;
-      case 'account': {
-        // Strip the "type" key before merging into account state
-        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.candle));
-        break;
-      case 'account': {
-        // Server spreads account fields directly onto the message object.
-        // Strip the protocol 'type' key before dispatching to Redux.
-        // eslint-disable-next-line no-unused-vars
-        const { type: _t, ...accountData } = msg;
-        store.dispatch(updateAccount(accountData));
-        break;
-      }
-      case 'order':
-        this._handleOrderMessage(msg);
-        break;
-      case 'orders':
-        // Full orders snapshot sent after authentication
-        store.dispatch(setOrders(msg.open || [], msg.pending || [], msg.history || []));
-        break;
-      case 'auth_ok':
-        store.dispatch(addLog('info', `Authenticated as ${msg.role} – ${msg.name}`));
-        // Request open orders from backend after successful auth
-        if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-          this._ws.send(JSON.stringify({ type: 'get_orders' }));
-        }
-        break;
-      case 'auth_error':
-        store.dispatch(addLog('warn', `WebSocket auth failed: ${msg.message}`));
-        break;
-      case 'welcome':
-        // Order events (open / close / modify) broadcast by the server after
-        // a REST-initiated trade.  Re-sync the full order list on close so
-        // history is always accurate.
-        if (msg.action === 'close') {
-          store.dispatch(closeOrder(msg.order.ticket));
-          store.dispatch(addHistoryOrder(msg.order));
-        }
-        break;
-      case 'auth_ok':
-        store.dispatch(addLog('info', `Authenticated as ${msg.name} (${msg.role})`));
-        break;
-      case 'auth_error':
-        store.dispatch(addLog('error', `WS auth failed: ${msg.message}`));
-        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.candle || msg.data));
+        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data));
         break;
       case 'account':
-        // Backend sends the full account object; map to frontend shape
-        store.dispatch(updateAccount({
-          balance:     msg.balance,
-          equity:      msg.equity,
-          margin:      msg.margin,
-          freeMargin:  msg.freeMargin,
-          marginLevel: msg.marginLevel,
-          profit:      msg.profit,
-          leverage:    msg.leverage,
-          login:       msg.login,
-          server:      msg.server,
-        }));
-        break;
-      case 'order':
-        // Order lifecycle events from backend
-        store.dispatch(addLog('debug', `Order event: ${msg.action} #${msg.order && msg.order.ticket}`));
-        break;
-      case 'risk':
-        // Broker risk data – handled by BrokerMonitor via Redux if needed
+        store.dispatch(updateAccount(msg.data));
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));
-    }
-  }
-
-  _handleOrderMessage(msg) {
-    const { action, order } = msg;
-    if (!order) return;
-    switch (action) {
-      case 'open':
-        // Add to local store if not already present
-        if (!store.getState().orders.openOrders.find((o) => o.ticket === order.ticket) &&
-            !store.getState().orders.pendingOrders.find((o) => o.ticket === order.ticket)) {
-          store.dispatch(placeOrder(order));
-        }
-        break;
-      case 'close': {
-        // Move from open to history
-        const exists = store.getState().orders.openOrders.find((o) => o.ticket === order.ticket);
-        if (exists) {
-          store.dispatch(closeOrder(order.ticket));
-          if (order.closeTime) {
-            store.dispatch(addHistoryOrder({ ...order }));
-          }
-        } else {
-          // May be a pending order cancellation
-          store.dispatch(cancelPendingOrder(order.ticket));
-        }
-        if (order.balance != null) {
-          store.dispatch(updateAccount({ balance: order.balance }));
-        }
-        break;
-      }
-      case 'modify':
-        store.dispatch(modifyOrder(order.ticket, order.sl, order.tp));
-        break;
-      default:
-        break;
     }
   }
 }
