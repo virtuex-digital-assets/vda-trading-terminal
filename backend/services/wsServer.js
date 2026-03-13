@@ -55,10 +55,18 @@ function send(ws, payload) {
   }
 }
 
-/** Seed candle history for all symbols on startup. */
+/** Seed candle history for all active symbols on startup. */
 function seedCandles() {
   const timeframes = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1'];
-  DEFAULT_SYMBOLS.forEach((sym) => {
+
+  // Use the symbol registry for the canonical list; fall back to DEFAULT_SYMBOLS
+  const symbols = db.symbolRegistry
+    ? [...db.symbolRegistry.entries()]
+        .filter(([, cfg]) => cfg && cfg.active)
+        .map(([sym]) => sym)
+    : DEFAULT_SYMBOLS;
+
+  symbols.forEach((sym) => {
     timeframes.forEach((tf) => {
       const key = `${sym}_${tf}`;
       if (!db.candles.has(key)) {
@@ -82,7 +90,12 @@ function seedCandles() {
 function tick() {
   const timeframe = 'M1'; // default tick timeframe
 
-  DEFAULT_SYMBOLS.forEach((sym) => {
+  // Tick only active symbols from registry
+  const symbols = db.symbolRegistry
+    ? [...db.symbolRegistry.entries()].filter(([, cfg]) => cfg.active).map(([sym]) => sym)
+    : DEFAULT_SYMBOLS;
+
+  symbols.forEach((sym) => {
     const key      = `${sym}_${timeframe}`;
     const candles  = db.candles.get(key) || [];
     if (candles.length === 0) return;
@@ -110,8 +123,10 @@ function tick() {
   // Recalculate every account
   db.accounts.forEach((account) => {
     recalculateAccount(account.id);
+    // eslint-disable-next-line no-unused-vars
+    const { userId, ...safeAccount } = account;
     broadcast(
-      { type: 'account', ...account },
+      { type: 'account', ...safeAccount },
       (client) => client._accountId === account.id
     );
   });
@@ -160,8 +175,10 @@ function startWsServer(httpServer) {
           const account = getAccountByUserId(user.id);
           if (account) {
             ws._accountId = account.id;
+            // eslint-disable-next-line no-unused-vars
+            const { userId, ...safeAccount } = account;
             // Send current state to the newly authenticated client
-            send(ws, { type: 'account', ...account });
+            send(ws, { type: 'account', ...safeAccount });
           }
           send(ws, { type: 'auth_ok', role: user.role, name: user.name });
 

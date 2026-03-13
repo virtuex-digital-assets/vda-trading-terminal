@@ -22,6 +22,7 @@ import {
   setOrders,
   addHistoryOrder,
   cancelPendingOrder,
+  addHistoryOrder,
   setConnectionStatus,
   addLog,
 } from '../store/actions';
@@ -102,6 +103,16 @@ class MT4Bridge {
     if (this._ws) {
       this._ws.close();
       this._ws = null;
+    }
+  }
+
+  /**
+   * Subscribe to candle history for a symbol/timeframe via WebSocket.
+   * The backend will respond with a { type: 'candles', ... } message.
+   */
+  subscribeCandles(symbol, timeframe) {
+    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+      this._ws.send(JSON.stringify({ type: 'subscribe_candles', symbol, timeframe }));
     }
   }
 
@@ -250,6 +261,12 @@ class MT4Bridge {
       // Authenticate with the backend WebSocket if a token is available
       if (this._authToken) {
         this._ws.send(JSON.stringify({ type: 'auth', token: this._authToken }));
+      // Authenticate with the backend so it sends account-scoped updates.
+      store.dispatch(addLog('info', 'Connected to VDA backend WebSocket'));
+      // Authenticate with JWT if available
+      const token = localStorage.getItem('vda_token');
+      if (token) {
+        this._ws.send(JSON.stringify({ type: 'auth', token }));
       }
     };
 
@@ -278,6 +295,16 @@ class MT4Bridge {
 
   _handleBridgeMessage(msg) {
     switch (msg.type) {
+      case 'welcome':
+        store.dispatch(addLog('info', msg.message || 'WebSocket connected'));
+        break;
+      case 'auth_ok':
+        store.dispatch(setConnectionStatus({ status: 'connected', broker: msg.name || 'VDA Backend' }));
+        store.dispatch(addLog('info', `Authenticated as ${msg.role} — ${msg.name}`));
+        break;
+      case 'auth_error':
+        store.dispatch(addLog('error', `Auth error: ${msg.message}`));
+        break;
       case 'quote':
         store.dispatch(updateQuote(msg.symbol, msg.bid, msg.ask, msg.time));
         break;
@@ -289,6 +316,12 @@ class MT4Bridge {
         break;
       case 'account': {
         // Strip the "type" key before merging into account state
+        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.candle));
+        break;
+      case 'account': {
+        // Server spreads account fields directly onto the message object.
+        // Strip the protocol 'type' key before dispatching to Redux.
+        // eslint-disable-next-line no-unused-vars
         const { type: _t, ...accountData } = msg;
         store.dispatch(updateAccount(accountData));
         break;
@@ -311,6 +344,41 @@ class MT4Bridge {
         store.dispatch(addLog('warn', `WebSocket auth failed: ${msg.message}`));
         break;
       case 'welcome':
+        // Order events (open / close / modify) broadcast by the server after
+        // a REST-initiated trade.  Re-sync the full order list on close so
+        // history is always accurate.
+        if (msg.action === 'close') {
+          store.dispatch(closeOrder(msg.order.ticket));
+          store.dispatch(addHistoryOrder(msg.order));
+        }
+        break;
+      case 'auth_ok':
+        store.dispatch(addLog('info', `Authenticated as ${msg.name} (${msg.role})`));
+        break;
+      case 'auth_error':
+        store.dispatch(addLog('error', `WS auth failed: ${msg.message}`));
+        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.candle || msg.data));
+        break;
+      case 'account':
+        // Backend sends the full account object; map to frontend shape
+        store.dispatch(updateAccount({
+          balance:     msg.balance,
+          equity:      msg.equity,
+          margin:      msg.margin,
+          freeMargin:  msg.freeMargin,
+          marginLevel: msg.marginLevel,
+          profit:      msg.profit,
+          leverage:    msg.leverage,
+          login:       msg.login,
+          server:      msg.server,
+        }));
+        break;
+      case 'order':
+        // Order lifecycle events from backend
+        store.dispatch(addLog('debug', `Order event: ${msg.action} #${msg.order && msg.order.ticket}`));
+        break;
+      case 'risk':
+        // Broker risk data – handled by BrokerMonitor via Redux if needed
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));

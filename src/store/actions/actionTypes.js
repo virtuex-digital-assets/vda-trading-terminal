@@ -13,6 +13,7 @@ export const CLOSE_ORDER = 'CLOSE_ORDER';
 export const MODIFY_ORDER = 'MODIFY_ORDER';
 export const UPDATE_ORDER_PROFIT = 'UPDATE_ORDER_PROFIT';
 export const CANCEL_PENDING_ORDER = 'CANCEL_PENDING_ORDER';
+// Bulk-load orders from backend; add a single closed order to history
 export const SET_ORDERS = 'SET_ORDERS';
 export const ADD_HISTORY_ORDER = 'ADD_HISTORY_ORDER';
 
