@@ -71,9 +71,14 @@ const ordersReducer = (state = initialState, action) => {
     }
 
     case SET_ORDERS: {
-      // Replace entire orders state with data from the backend.
-      const { open = [], pending = [], history = [] } = action.payload;
-      return { ...state, openOrders: open, pendingOrders: pending, history };
+      // Only replace the keys that are explicitly provided in the payload.
+      const { open, pending, history } = action.payload;
+      return {
+        ...state,
+        ...(open    !== undefined && { openOrders:    open }),
+        ...(pending !== undefined && { pendingOrders: pending }),
+        ...(history !== undefined && { history }),
+      };
     }
 
     case ADD_HISTORY_ORDER: {

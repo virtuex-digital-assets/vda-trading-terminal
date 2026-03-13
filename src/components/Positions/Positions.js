@@ -97,7 +97,7 @@ const Positions = () => {
     const q = quotes[symbol] || {};
     const closePrice = type === 'BUY' ? q.bid : q.ask;
     const order = openOrders.find((o) => o.ticket === ticket);
-    const profit = order ? (order.profit || 0) : 0;
+    const profit = order?.profit ?? 0;
 
     setCloseError('');
     setClosingTicket(ticket);

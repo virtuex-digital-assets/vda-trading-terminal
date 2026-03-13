@@ -86,7 +86,7 @@ class BackendBridge {
     const data = await res.json();
     const open    = Array.isArray(data)          ? data.filter((o) => !o.closeTime) : (data.open    || []);
     const pending = Array.isArray(data)          ? []                               : (data.pending || []);
-    store.dispatch({ type: SET_ORDERS, payload: { open, pending, history: [] } });
+    store.dispatch({ type: SET_ORDERS, payload: { open, pending } });
     return { open, pending };
   }
 
@@ -250,7 +250,7 @@ class BackendBridge {
         break;
 
       case 'candles':
-        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.candles));
+        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.candles || msg.data));
         break;
 
       case 'candle':
