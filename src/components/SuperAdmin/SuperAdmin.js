@@ -46,8 +46,7 @@ const DEFAULT_SYMBOLS = [
   { symbol: 'BTCUSD',  spread: 50,  leverageCap: 10,  active: false },
 ];
 
-const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'settings'];
-const TABS = ['overview', 'accounts', 'symbols', 'trades', 'audit', 'settings'];
+const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'audit', 'settings'];
 const TAB_LABELS = {
   overview: '📊 Overview',
   crm:      '👥 CRM',

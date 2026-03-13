@@ -4,7 +4,6 @@ import { placeOrder, addLog } from '../../store/actions';
 import backendBridge from '../../services/backendBridge';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
-import backendBridge from '../../services/backendBridge';
 import './OrderPanel.css';
 
 const ORDER_TYPES = ['BUY', 'SELL', 'BUY LIMIT', 'SELL LIMIT', 'BUY STOP', 'SELL STOP'];
@@ -69,21 +68,9 @@ const OrderPanel = () => {
     };
 
     if (backendBridge.isConfigured()) {
-      setSubmitting(true);
-      try {
-        const confirmed = await backendBridge.placeOrder(order);
-        // Dispatch with the backend-assigned ticket so Redux state matches.
-        dispatch(placeOrder(confirmed));
-        dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
-        setPrice('');
-        setComment('');
-      } catch (err) {
-        dispatch(addLog('error', `Order rejected: ${err.message}`));
-    setSubmitError('');
-    setSubmitting(true);
-
-    if (backendBridge.isConfigured()) {
       // ── Live backend mode ───────────────────────────────────────────────
+      setSubmitError('');
+      setSubmitting(true);
       try {
         const placed = await backendBridge.placeOrder(order);
         // Dispatch with server-assigned ticket so UI reflects backend state
@@ -104,40 +91,12 @@ const OrderPanel = () => {
         setSubmitting(false);
       }
     } else {
-      // Simulator / offline mode – dispatch directly to Redux.
+      // ── Demo / simulator mode ────────────────────────────────────────────
       dispatch(placeOrder(order));
       dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
       setPrice('');
       setComment('');
     }
-      // ── Demo / simulator mode ────────────────────────────────────────────
-    if (backendBridge.isConfigured()) {
-      // Live backend: REST API creates the order and assigns a server ticket.
-      backendBridge.placeOrder(order);
-    } else {
-      dispatch(placeOrder(order));
-      // Note: account margin is recalculated automatically on each simulator tick
-      try {
-        await backendBridge.placeOrder(order);
-      } catch (err) {
-        dispatch(addLog('error', `Order failed: ${err.message}`));
-        return;
-      }
-    } else {
-      dispatch(placeOrder(order));
-      dispatch(
-        addLog(
-          'info',
-          `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
-        )
-      );
-      setPrice('');
-      setComment('');
-      setSubmitting(false);
-    }
-    }
-    setPrice('');
-    setComment('');
   };
 
   return (

@@ -212,6 +212,7 @@ body {
   .wallet       { grid-column: 1; grid-row: 2; }
   .order-form   { grid-column: 1; grid-row: 3; }
   .order-history { grid-column: 1; }
+}
 /* ── Root layout ─────────────────────────────────────────────────────────── */
 
 html, body, #root {
