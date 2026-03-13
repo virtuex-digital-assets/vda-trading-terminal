@@ -1,0 +1,63 @@
+.account-info {
+  background: #16213e;
+  border-right: 1px solid #2a2a4a;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.ai-grid {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+  border-bottom: 1px solid #1e1e3a;
+}
+
+.ai-label {
+  font-size: 11px;
+  color: #5566aa;
+}
+
+.ai-value {
+  font-size: 12px;
+  color: #c8d0e0;
+  font-weight: 600;
+}
+
+.ai-value.positive { color: #66bb6a; }
+.ai-value.negative { color: #ef5350; }
+
+.ai-footer {
+  padding: 5px 8px;
+  font-size: 10px;
+  border-top: 1px solid #2a2a4a;
+  margin-top: auto;
+}
+
+.status-connected { color: #66bb6a; }
+.status-connecting { color: #ffcc44; }
+.status-disconnected { color: #8899bb; }
+.status-error { color: #ef5350; }
+
+.conn-dot {
+  margin-left: 8px;
+  font-size: 10px;
+}
+.conn-connected { color: #66bb6a; }
+.conn-connecting { color: #ffcc44; }
+.conn-disconnected { color: #8899bb; }
+.conn-error { color: #ef5350; }
+
+.ping {
+  margin-left: 6px;
+  font-size: 10px;
+  color: #5566aa;
+}
