@@ -8,6 +8,10 @@ import {
   UPDATE_ACCOUNT,
   ADD_LOG,
 } from '../../store/actions/actionTypes';
+import CRMView from '../CRM/CRMView';
+import BrokerMonitor from '../BrokerMonitor/BrokerMonitor';
+import MarketFeed from '../MarketFeed/MarketFeed';
+import Terminal from '../Terminal/Terminal';
 import './SuperAdmin.css';
 
 /**
@@ -15,6 +19,10 @@ import './SuperAdmin.css';
  *
  * Provides privileged operations beyond the broker dashboard:
  *  • Global platform statistics
+ *  • CRM – full client relationship management
+ *  • Risk Monitor – broker exposure & margin risk
+ *  • Market Feed – live trading signals
+ *  • Terminal Log – system event log
  *  • User / broker account management (create, suspend, adjust balance)
  *  • Symbol configuration (spread, leverage cap)
  *  • Trade history review
@@ -37,9 +45,13 @@ const DEFAULT_SYMBOLS = [
   { symbol: 'BTCUSD',  spread: 50,  leverageCap: 10,  active: false },
 ];
 
-const TABS = ['overview', 'accounts', 'symbols', 'trades', 'settings'];
+const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'settings'];
 const TAB_LABELS = {
   overview: '📊 Overview',
+  crm:      '👥 CRM',
+  risk:     '🛡 Risk Monitor',
+  feed:     '🎬 Market Feed',
+  terminal: '🖥 Terminal Log',
   accounts: '👤 Accounts',
   symbols:  '📈 Symbols',
   trades:   '📋 Trades',
@@ -527,6 +539,34 @@ const SuperAdmin = () => {
               </table>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── CRM ──────────────────────────────────────────────────────────── */}
+      {tab === 'crm' && (
+        <div className="sa-embed-view">
+          <CRMView />
+        </div>
+      )}
+
+      {/* ── Risk Monitor ─────────────────────────────────────────────────── */}
+      {tab === 'risk' && (
+        <div className="sa-embed-view">
+          <BrokerMonitor />
+        </div>
+      )}
+
+      {/* ── Market Feed ──────────────────────────────────────────────────── */}
+      {tab === 'feed' && (
+        <div className="sa-embed-view">
+          <MarketFeed />
+        </div>
+      )}
+
+      {/* ── Terminal Log ─────────────────────────────────────────────────── */}
+      {tab === 'terminal' && (
+        <div className="sa-embed-view">
+          <Terminal />
         </div>
       )}
 

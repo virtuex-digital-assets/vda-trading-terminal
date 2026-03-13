@@ -292,3 +292,17 @@
   color: #4050a0;
   font-style: italic;
 }
+
+/* ── Embedded sub-view wrapper ──────────────────────────────────────────────── */
+.sa-embed-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sa-embed-view > * {
+  flex: 1;
+  min-height: 0;
+}
