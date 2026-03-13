@@ -14,6 +14,7 @@
   gap: 8px;
   flex-shrink: 0;
   border-bottom: 1px solid #2a2a4a;
+  flex-wrap: wrap;
 }
 
 .chart-symbol {
@@ -52,6 +53,46 @@
 .tf-btn:hover { background: #1e2a4a; color: #ccd; }
 .tf-btn.active { background: #0f3460; color: #e0e8ff; border-color: #4488cc; }
 
+/* Technical indicator dropdown */
+.indicator-select {
+  background: #16213e;
+  color: #8899bb;
+  border: 1px solid #2a2a4a;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 2px;
+  outline: none;
+}
+.indicator-select:hover,
+.indicator-select:focus { border-color: #4488cc; color: #e0e8ff; }
+
+/* Zoom controls */
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.zoom-btn {
+  background: #16213e;
+  color: #8899bb;
+  border: 1px solid #2a2a4a;
+  padding: 2px 7px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  line-height: 1;
+}
+.zoom-btn:hover { background: #1e2a4a; color: #e0e8ff; }
+
+.zoom-label {
+  font-size: 10px;
+  color: #5566aa;
+  min-width: 36px;
+  text-align: center;
+}
+
 .chart-container {
   flex: 1;
   overflow: hidden;
@@ -61,4 +102,5 @@
 .chart-canvas {
   width: 100%;
   height: 100%;
+  display: block;
 }

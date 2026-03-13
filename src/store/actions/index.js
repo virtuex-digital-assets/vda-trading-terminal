@@ -118,6 +118,23 @@ export const setOrders = (orders) => ({
 /**
  * Prepend a single closed order to trade history (used after REST close).
  * @param {object} order
+ * Replace all orders in the store with data loaded from the backend.
+ * @param {object[]} [open]     Open market orders
+ * @param {object[]} [pending]  Pending limit/stop orders
+ * @param {object[]} [history]  Closed trade history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: {
+    ...(open    !== undefined && { open }),
+    ...(pending !== undefined && { pending }),
+    ...(history !== undefined && { history }),
+  },
+});
+
+/**
+ * Prepend a single closed order to the history array (deduplicates by ticket).
+ * @param {object} order  Closed order object from the backend
  */
 export const addHistoryOrder = (order) => ({
   type: ADD_HISTORY_ORDER,
