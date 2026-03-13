@@ -34,7 +34,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Enable GitHub Pages (branch source)
+      - name: Configure GitHub Pages source
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -42,10 +42,17 @@ jobs:
             -X POST \
             -f "source[branch]=gh-pages" \
             -f "source[path]=/" \
-            2>&1 | tee /tmp/pages-enable.log || echo "Pages already enabled or enable failed (see log above)"
+            2>/dev/null \
+          || gh api repos/${{ github.repository }}/pages \
+            -X PUT \
+            -f "source[branch]=gh-pages" \
+            -f "source[path]=/" \
+            2>/dev/null \
+          || echo "Pages source already configured."
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
+          enable_jekyll: false
