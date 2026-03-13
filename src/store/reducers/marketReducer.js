@@ -1,3 +1,9 @@
+import { UPDATE_PRICES, SET_MARKET_ERROR, SET_MARKET_LOADING } from '../actions';
+
+const initialState = {
+  prices: {},
+  loading: false,
+  error: null,
 import { UPDATE_QUOTE, SET_ACTIVE_SYMBOL, SET_CANDLES, ADD_CANDLE, SET_TIMEFRAME } from '../actions/actionTypes';
 
 // Default symbols available in the terminal
@@ -16,6 +22,12 @@ const initialState = {
 
 const marketReducer = (state = initialState, action) => {
   switch (action.type) {
+    case SET_MARKET_LOADING:
+      return { ...state, loading: action.payload };
+    case SET_MARKET_ERROR:
+      return { ...state, error: action.payload, loading: false };
+    case UPDATE_PRICES:
+      return { ...state, prices: action.payload, loading: false, error: null };
     case UPDATE_QUOTE: {
       const { symbol, bid, ask, time } = action.payload;
       const prev = state.quotes[symbol] || {};

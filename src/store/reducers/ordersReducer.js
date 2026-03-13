@@ -1,3 +1,8 @@
+import { PLACE_ORDER } from '../actions';
+
+const initialState = {
+  orders: [],
+  nextId: 1,
 import { PLACE_ORDER, CLOSE_ORDER, MODIFY_ORDER, UPDATE_ORDER_PROFIT, CANCEL_PENDING_ORDER, SET_ORDERS, ADD_HISTORY_ORDER } from '../actions/actionTypes';
 
 let ticketCounter = 1000;
@@ -11,6 +16,13 @@ const initialState = {
 const ordersReducer = (state = initialState, action) => {
   switch (action.type) {
     case PLACE_ORDER: {
+      const order = {
+        ...action.payload,
+        id: state.nextId,
+        timestamp: new Date().toISOString(),
+      };
+      return { ...state, orders: [order, ...state.orders], nextId: state.nextId + 1 };
+    }
       // Use server-supplied ticket if provided (backend mode), otherwise auto-generate
       const ticket = action.payload.ticket != null ? action.payload.ticket : ++ticketCounter;
       const order = { ...action.payload, ticket, openTime: action.payload.openTime || new Date().toISOString(), profit: action.payload.profit || 0 };
