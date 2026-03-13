@@ -140,3 +140,13 @@ html, body, #root {
   overflow-y: auto;
   border-left: 1px solid #2a2a4a;
 }
+
+/* ── Broker Risk Monitor full-page view ──────────────────────────────────── */
+
+.broker-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
