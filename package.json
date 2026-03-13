@@ -20,6 +20,7 @@
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "^4.0.3",
+    "axios": "^1.13.6",
     "axios": "^1.13.5",
     "axios": "^1.13.6",
     "react": "^17.0.2",
@@ -54,6 +55,8 @@
     "@testing-library/react": "^11.2.7",
     "@testing-library/jest-dom": "^5.14.1"
   },
+  "homepage": "https://github.com/virtuex-digital-assets/vda-trading-terminal"
+}
   "homepage": "https://www.virtuexdigitalasset.com/"
     "@testing-library/jest-dom": "^5.14.1",
     "@testing-library/user-event": "^12.8.3"
