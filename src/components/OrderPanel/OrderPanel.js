@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
+import backendBridge from '../../services/backendBridge';
 import './OrderPanel.css';
 
 const ORDER_TYPES = ['BUY', 'SELL', 'BUY LIMIT', 'SELL LIMIT', 'BUY STOP', 'SELL STOP'];
@@ -20,6 +21,7 @@ const OrderPanel = () => {
   const [tp, setTp] = useState('');
   const [price, setPrice] = useState('');
   const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const quote = quotes[activeSymbol] || {};
   const isMarket = orderType === 'BUY' || orderType === 'SELL';
@@ -34,8 +36,10 @@ const OrderPanel = () => {
     : 0;
 
   const canTrade = freeMargin >= requiredMargin && openPrice > 0 && lots > 0;
+  const btnDisabled = !canTrade || submitting;
+  const btnClass = (side) => `op-btn ${side}${btnDisabled ? ' disabled' : ''}`;
 
-  const submitOrder = (type) => {
+  const submitOrder = async (type) => {
     const isBuyType = type.startsWith('BUY');
     const execPrice = isMarket
       ? (isBuyType ? quote.ask : quote.bid)
@@ -62,16 +66,27 @@ const OrderPanel = () => {
       comment,
     };
 
-    dispatch(placeOrder(order));
-    // Note: account margin is recalculated automatically on each simulator tick
-    dispatch(
-      addLog(
-        'info',
-        `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
-      )
-    );
-    setPrice('');
-    setComment('');
+    if (backendBridge.isConfigured()) {
+      setSubmitting(true);
+      try {
+        const confirmed = await backendBridge.placeOrder(order);
+        // Dispatch with the backend-assigned ticket so Redux state matches.
+        dispatch(placeOrder(confirmed));
+        dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
+        setPrice('');
+        setComment('');
+      } catch (err) {
+        dispatch(addLog('error', `Order rejected: ${err.message}`));
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // Simulator / offline mode – dispatch directly to Redux.
+      dispatch(placeOrder(order));
+      dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
+      setPrice('');
+      setComment('');
+    }
   };
 
   return (
@@ -189,21 +204,22 @@ const OrderPanel = () => {
 
         <div className="op-actions">
           <button
-            className={`op-btn buy${!canTrade ? ' disabled' : ''}`}
+            className={btnClass('buy')}
             onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
-            disabled={!canTrade}
+            disabled={btnDisabled}
           >
             ▲ BUY
           </button>
           <button
-            className={`op-btn sell${!canTrade ? ' disabled' : ''}`}
+            className={btnClass('sell')}
             onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
-            disabled={!canTrade}
+            disabled={btnDisabled}
           >
             ▼ SELL
           </button>
         </div>
-        {!canTrade && openPrice > 0 && (
+        {submitting && <div className="op-warn">Sending order…</div>}
+        {!canTrade && !submitting && openPrice > 0 && (
           <div className="op-warn">Insufficient margin</div>
         )}
       </div>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { closeOrder, modifyOrder, addLog, updateAccount } from '../../store/actions';
+import { closeOrder, modifyOrder, cancelPendingOrder, addLog, updateAccount, addHistoryOrder } from '../../store/actions';
 import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
+import backendBridge from '../../services/backendBridge';
 import './Positions.css';
 
 const TABS = ['Positions', 'Orders', 'History'];
@@ -89,7 +90,21 @@ const Positions = () => {
   const { quotes } = useSelector((s) => s.market);
   const { balance } = useSelector((s) => s.account);
 
-  const handleClose = (ticket, symbol, type, lots, openPrice) => {
+  const handleClose = async (ticket, symbol, type, lots, openPrice) => {
+    if (backendBridge.isConfigured()) {
+      try {
+        const closed = await backendBridge.closeOrder(ticket);
+        dispatch(closeOrder(ticket));
+        dispatch(addHistoryOrder(closed));
+        // Refresh account state to reflect realised P&L
+        backendBridge.getAccount().catch(() => {});
+        dispatch(addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol}`));
+      } catch (err) {
+        dispatch(addLog('error', `Failed to close #${ticket}: ${err.message}`));
+      }
+      return;
+    }
+    // Simulator / offline mode
     const q = quotes[symbol] || {};
     const closePrice = type === 'BUY' ? q.bid : q.ask;
     const order = openOrders.find((o) => o.ticket === ticket);
@@ -102,7 +117,32 @@ const Positions = () => {
     );
   };
 
-  const handleModifySave = (ticket, sl, tp) => {
+  const handleCancelPending = async (ticket) => {
+    if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.closeOrder(ticket);
+        dispatch(cancelPendingOrder(ticket));
+        dispatch(addLog('info', `Cancelled pending order #${ticket}`));
+      } catch (err) {
+        dispatch(addLog('error', `Failed to cancel #${ticket}: ${err.message}`));
+      }
+      return;
+    }
+    dispatch(cancelPendingOrder(ticket));
+    dispatch(addLog('info', `Cancelled pending order #${ticket}`));
+  };
+
+  const handleModifySave = async (ticket, sl, tp) => {
+    if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.modifyOrder(ticket, sl, tp);
+        dispatch(modifyOrder(ticket, sl, tp));
+        dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+      } catch (err) {
+        dispatch(addLog('error', `Failed to modify #${ticket}: ${err.message}`));
+      }
+      return;
+    }
     dispatch(modifyOrder(ticket, sl, tp));
     dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
   };
@@ -208,11 +248,12 @@ const Positions = () => {
                 <th>SL</th>
                 <th>TP</th>
                 <th>Placed</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pendingOrders.length === 0 ? (
-                <tr><td colSpan={8} className="empty">No pending orders</td></tr>
+                <tr><td colSpan={9} className="empty">No pending orders</td></tr>
               ) : (
                 pendingOrders.map((o) => (
                   <tr key={o.ticket}>
@@ -224,6 +265,15 @@ const Positions = () => {
                     <td>{o.sl ? formatPrice(o.symbol, o.sl) : '—'}</td>
                     <td>{o.tp ? formatPrice(o.symbol, o.tp) : '—'}</td>
                     <td>{formatDateTime(o.openTime)}</td>
+                    <td>
+                      <button
+                        className="close-btn"
+                        title="Cancel pending order"
+                        onClick={() => handleCancelPending(o.ticket)}
+                      >
+                        ✕
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

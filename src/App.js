@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
+import backendBridge from './services/backendBridge';
 
 import MarketWatch    from './components/MarketWatch/MarketWatch';
 import Chart          from './components/Chart/Chart';
@@ -27,6 +28,13 @@ const AppInner = () => {
   const [showLogin,  setShowLogin]  = useState(false);
 
   useEffect(() => {
+    if (backendBridge.isConfigured()) {
+      // Connect to backend WebSocket (market data + real-time updates).
+      // The simulator is NOT started when a live backend is configured.
+      backendBridge.connect();
+      return () => backendBridge.disconnect();
+    }
+    // Standalone / demo mode – use the built-in market simulator.
     if (MT4_BRIDGE_URL) {
       mt4Bridge.connect(MT4_BRIDGE_URL);
     } else {
@@ -38,6 +46,13 @@ const AppInner = () => {
   const handleLogin = (role) => {
     setUserRole(role);
     setShowLogin(false);
+    if (backendBridge.isConfigured()) {
+      // Re-authenticate the existing WS connection with the new JWT, then
+      // pull the latest account state and orders from the backend.
+      backendBridge.authenticate();
+      backendBridge.getAccount().catch(() => {});
+    }
+    }
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin') setAppMode('broker');
   };

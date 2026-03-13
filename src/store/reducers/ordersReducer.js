@@ -1,4 +1,4 @@
-import { PLACE_ORDER, CLOSE_ORDER, MODIFY_ORDER, UPDATE_ORDER_PROFIT, CANCEL_PENDING_ORDER } from '../actions/actionTypes';
+import { PLACE_ORDER, CLOSE_ORDER, MODIFY_ORDER, UPDATE_ORDER_PROFIT, CANCEL_PENDING_ORDER, SET_ORDERS, ADD_HISTORY_ORDER } from '../actions/actionTypes';
 
 let ticketCounter = 1000;
 
@@ -11,7 +11,11 @@ const initialState = {
 const ordersReducer = (state = initialState, action) => {
   switch (action.type) {
     case PLACE_ORDER: {
-      const order = { ...action.payload, ticket: ++ticketCounter, openTime: new Date().toISOString(), profit: 0 };
+      // If the order already has a ticket (e.g. confirmed by backend) use it;
+      // otherwise generate a new one for simulator/optimistic mode.
+      const ticket = action.payload.ticket || ++ticketCounter;
+      const openTime = action.payload.openTime || new Date().toISOString();
+      const order = { ...action.payload, ticket, openTime, profit: action.payload.profit ?? 0 };
       if (order.type === 'BUY' || order.type === 'SELL') {
         return { ...state, openOrders: [...state.openOrders, order] };
       }
@@ -56,6 +60,15 @@ const ordersReducer = (state = initialState, action) => {
         ...state,
         pendingOrders: state.pendingOrders.filter((o) => o.ticket !== action.payload),
       };
+    }
+
+    case SET_ORDERS: {
+      const { open, pending, history } = action.payload;
+      return { ...state, openOrders: open, pendingOrders: pending, history };
+    }
+
+    case ADD_HISTORY_ORDER: {
+      return { ...state, history: [action.payload, ...state.history] };
     }
 
     default:
