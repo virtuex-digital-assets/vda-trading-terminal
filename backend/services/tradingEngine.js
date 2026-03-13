@@ -10,6 +10,7 @@
 
 const db = require('../models');
 const { calculateMargin, calculatePnL } = require('../utils/margin');
+const config = require('../config/config');
 
 // ── Slippage helpers ────────────────────────────────────────────────────────
 
@@ -27,13 +28,12 @@ const { calculateMargin, calculatePnL } = require('../utils/margin');
  * @param {number}  price     Raw mid/ask/bid price
  * @returns {number}  Slippage-adjusted execution price
  */
-const SLIP_FACTOR = 1.5; // max slippage = 1.5× spread
-
 function applySlippage(symbol, type, price) {
   try {
+    const slipFactor = config.maxSlippageFactor || 1.5;
     const cfg    = db.symbolRegistry && db.symbolRegistry.get(symbol);
     const spread = cfg ? (cfg.spread || 0) : 0;
-    const slip   = spread * Math.random() * SLIP_FACTOR;
+    const slip   = spread * Math.random() * slipFactor;
     // BUY  → trader pays more (price rises)
     // SELL → trader receives less (price falls)
     return type === 'BUY' ? price + slip : price - slip;

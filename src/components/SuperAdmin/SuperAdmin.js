@@ -73,6 +73,7 @@ const newId = () => {
 };
 
 const SuperAdmin = () => {
+  const METRICS_REFRESH_INTERVAL = 10_000; // ms between system metrics polls
   const dispatch   = useDispatch();
   const orders     = useSelector((s) => s.orders);
   const account    = useSelector((s) => s.account);
@@ -101,6 +102,7 @@ const SuperAdmin = () => {
   const [msg,       setMsg]        = useState('');
   const [auditLog,  setAuditLog]   = useState([]);
   const [backendUsers, setBackendUsers] = useState([]);
+  const [metrics,   setMetrics]    = useState(null);
 
   // ── Fetch backend data when API is configured ────────────────────────────
   useEffect(() => {
@@ -127,6 +129,16 @@ const SuperAdmin = () => {
     backendBridge.getUsers()
       .then((users) => { if (Array.isArray(users)) setBackendUsers(users); })
       .catch((err) => { console.warn('[SuperAdmin] Failed to load users from backend:', err.message); });
+
+    // Load system metrics
+    const loadMetrics = () => {
+      backendBridge.getMetrics()
+        .then((m) => setMetrics(m))
+        .catch(() => {});
+    };
+    loadMetrics();
+    const metricsInterval = setInterval(loadMetrics, METRICS_REFRESH_INTERVAL); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => clearInterval(metricsInterval);
   }, []); // eslint-disable-line
 
   // ── Refresh audit log when audit tab is opened ───────────────────────────
@@ -401,6 +413,23 @@ const SuperAdmin = () => {
               </button>
             </div>
           </div>
+
+          {/* System metrics */}
+          {metrics && (
+            <div className="sa-section">
+              <div className="sa-section-title">⚙️ System Metrics</div>
+              <div className="sa-kpi-grid">
+                <KpiCard label="Uptime"         value={metrics.system.uptimeFormatted}               color="#a0b0ff" />
+                <KpiCard label="Heap Used"      value={`${metrics.system.memoryMB.heapUsed} MB`}     color="#50d0a0" />
+                <KpiCard label="Trades 24h"     value={metrics.trading.tradesLast24h}                 color="#e0c040" />
+                <KpiCard label="Closed Orders"  value={metrics.trading.closedOrders}                  color="#a0b0ff" />
+                <KpiCard label="Realised P&L"   value={formatProfit(metrics.trading.totalRealizedPnL)} color={metrics.trading.totalRealizedPnL >= 0 ? '#50d0a0' : '#ff6060'} />
+                <KpiCard label="Total Users"    value={metrics.users.totalUsers}                      color="#50d0a0" />
+                <KpiCard label="Wallet Txns"    value={metrics.wallet.totalTransactions}              color="#e0c040" />
+                <KpiCard label="Node"           value={metrics.system.nodeVersion}                    color="#a0b0ff" />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

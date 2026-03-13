@@ -14,6 +14,7 @@
 
 const db = require('../models');
 const { broadcast } = require('../services/wsServer');
+const config = require('../config/config');
 
 /**
  * POST /api/wallet/deposit
@@ -27,8 +28,9 @@ function requestDeposit(req, res) {
   if (isNaN(amount) || amount <= 0) {
     return res.status(400).json({ error: 'amount must be a positive number' });
   }
-  if (amount > 1_000_000) {
-    return res.status(400).json({ error: 'Single deposit limit is $1,000,000' });
+  const maxDeposit = config.maxDepositAmount || 1_000_000;
+  if (amount > maxDeposit) {
+    return res.status(400).json({ error: `Single deposit limit is $${maxDeposit.toLocaleString()}` });
   }
 
   const currency  = req.body.currency || 'USD';

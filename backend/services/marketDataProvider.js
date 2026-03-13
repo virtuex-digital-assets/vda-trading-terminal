@@ -35,7 +35,12 @@ const simulatorProvider = require('./providers/simulatorProvider');
 // Registry of available providers
 const PROVIDERS = {
   simulator: simulatorProvider,
-  // external: require('./providers/externalProvider'), // uncomment when ready
+  // To add an external provider:
+  // 1. Create backend/services/providers/externalProvider.js implementing
+  //    the same interface: subscribe(symbols, onTick) and getCandles(symbol, tf, count).
+  // 2. Set MARKET_DATA_PROVIDER=external in your .env file.
+  // 3. Add required API keys (e.g., MARKET_API_KEY) to .env.example and config.js.
+  // external: require('./providers/externalProvider'),
 };
 
 /**

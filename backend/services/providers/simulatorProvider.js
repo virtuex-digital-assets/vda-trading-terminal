@@ -61,7 +61,9 @@ function subscribe(symbols, onTick) {
     });
   }, TICK_MS);
 
-  // Prevent the timer from keeping the Node.js process alive in tests
+  // Prevent the timer from keeping the Node.js process alive in test
+  // environments where Jest tears down the module registry before all
+  // timers fire (avoids "Cannot use 'import' after environment teardown").
   if (timer.unref) timer.unref();
 
   return function cleanup() {

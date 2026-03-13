@@ -71,7 +71,9 @@ const walletTransactions = new Map();
 
 let txCounter = 1;
 function nextTxId() {
-  return `TX${String(txCounter++).padStart(6, '0')}`;
+  // Include a timestamp prefix so IDs remain unique across server restarts
+  const ts = Date.now().toString(36).toUpperCase();
+  return `TX${ts}${String(txCounter++).padStart(4, '0')}`;
 }
 
 function createWalletTransaction(userId, type, amount, currency = 'USD', note = '', reference = '') {

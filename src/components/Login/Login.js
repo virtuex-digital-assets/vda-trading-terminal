@@ -11,6 +11,10 @@ import './Login.css';
  * /api/auth/login or /api/auth/register endpoint and stores the returned JWT
  * in localStorage.
  *
+ * 2FA: When the server returns { twoFactorRequired: true } the form shows a
+ * TOTP input field. The user must enter the 6-digit code from their
+ * authenticator app and resubmit.
+ *
  * Props:
  *   onLogin(role)  – called after successful authentication ('super_admin'|'admin'|'trader')
  */
