@@ -82,18 +82,6 @@ export const cancelPendingOrder = (ticket) => ({
 });
 
 /**
- * Replace all orders in the store with data loaded from the backend.
- * @param {object[]} [open]     Open market orders
- * @param {object[]} [pending]  Pending limit/stop orders
- * @param {object[]} [history]  Closed trade history
- */
-export const setOrders = (open, pending, history) => ({
-  type: SET_ORDERS,
-  payload: {
-    ...(open    !== undefined && { open }),
-    ...(pending !== undefined && { pending }),
-    ...(history !== undefined && { history }),
-  },
  * Replace the entire orders state with data loaded from the backend.
  * @param {object[]} open     - open market orders
  * @param {object[]} pending  - pending limit/stop orders

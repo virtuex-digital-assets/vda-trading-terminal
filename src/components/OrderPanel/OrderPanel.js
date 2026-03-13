@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
+import backendBridge from '../../services/backendBridge';
 import './OrderPanel.css';
 
 const ORDER_TYPES = ['BUY', 'SELL', 'BUY LIMIT', 'SELL LIMIT', 'BUY STOP', 'SELL STOP'];
@@ -20,6 +21,8 @@ const OrderPanel = () => {
   const [tp, setTp] = useState('');
   const [price, setPrice] = useState('');
   const [comment, setComment] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const quote = quotes[activeSymbol] || {};
   const isMarket = orderType === 'BUY' || orderType === 'SELL';
@@ -63,20 +66,6 @@ const OrderPanel = () => {
     };
 
     if (backendBridge.isConfigured()) {
-      try {
-        await backendBridge.placeOrder(order);
-      } catch (err) {
-        dispatch(addLog('error', `Order failed: ${err.message}`));
-        return;
-      }
-    } else {
-      dispatch(placeOrder(order));
-      dispatch(
-        addLog(
-          'info',
-          `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
-        )
-      );
       // ── Live backend mode ───────────────────────────────────────────────
       setSubmitError('');
       setSubmitting(true);
@@ -239,6 +228,9 @@ const OrderPanel = () => {
         </div>
         {!canTrade && openPrice > 0 && (
           <div className="op-warn">Insufficient margin</div>
+        )}
+        {submitError && (
+          <div className="op-warn">{submitError}</div>
         )}
       </div>
     </div>
