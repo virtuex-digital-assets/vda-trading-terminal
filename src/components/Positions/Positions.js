@@ -1,14 +1,90 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { closeOrder, addLog, updateAccount } from '../../store/actions';
+import { closeOrder, modifyOrder, addLog, updateAccount } from '../../store/actions';
 import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
 import './Positions.css';
 
 const TABS = ['Positions', 'Orders', 'History'];
 
+// ── Modify Order Modal ─────────────────────────────────────────────────────
+const ModifyModal = ({ order, onClose, onSave }) => {
+  const { activeSymbol, quotes } = useSelector((s) => s.market);
+  const q = quotes[order.symbol] || {};
+  const [sl, setSl] = useState(order.sl ? String(order.sl) : '');
+  const [tp, setTp] = useState(order.tp ? String(order.tp) : '');
+
+  const handleSave = () => {
+    onSave(order.ticket, sl ? parseFloat(sl) : null, tp ? parseFloat(tp) : null);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          Modify Order #{order.ticket}
+          <button className="modal-close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="modal-row">
+            <span className="modal-label">Symbol</span>
+            <span className="modal-value sym">{order.symbol}</span>
+          </div>
+          <div className="modal-row">
+            <span className="modal-label">Type / Lots</span>
+            <span className="modal-value">{order.type} {order.lots}</span>
+          </div>
+          <div className="modal-row">
+            <span className="modal-label">Open Price</span>
+            <span className="modal-value">{formatPrice(order.symbol, order.openPrice)}</span>
+          </div>
+          <div className="modal-row">
+            <span className="modal-label">Current Bid/Ask</span>
+            <span className="modal-value">
+              <span className="bid">{formatPrice(order.symbol, q.bid)}</span>
+              {' / '}
+              <span className="ask">{formatPrice(order.symbol, q.ask)}</span>
+            </span>
+          </div>
+          <div className="modal-divider" />
+          <div className="modal-row">
+            <label className="modal-label" htmlFor="mod-sl">Stop Loss</label>
+            <input
+              id="mod-sl"
+              className="modal-input"
+              type="number"
+              step="0.00001"
+              placeholder="0 = no SL"
+              value={sl}
+              onChange={(e) => setSl(e.target.value)}
+            />
+          </div>
+          <div className="modal-row">
+            <label className="modal-label" htmlFor="mod-tp">Take Profit</label>
+            <input
+              id="mod-tp"
+              className="modal-input"
+              type="number"
+              step="0.00001"
+              placeholder="0 = no TP"
+              value={tp}
+              onChange={(e) => setTp(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="modal-btn cancel" onClick={onClose}>Cancel</button>
+          <button className="modal-btn save" onClick={handleSave}>Save Changes</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Positions = () => {
   const dispatch = useDispatch();
   const [tab, setTab] = useState('Positions');
+  const [modifyTarget, setModifyTarget] = useState(null);
   const { openOrders, pendingOrders, history } = useSelector((s) => s.orders);
   const { quotes } = useSelector((s) => s.market);
   const { balance } = useSelector((s) => s.account);
@@ -26,10 +102,22 @@ const Positions = () => {
     );
   };
 
+  const handleModifySave = (ticket, sl, tp) => {
+    dispatch(modifyOrder(ticket, sl, tp));
+    dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+  };
+
   const totalProfit = openOrders.reduce((sum, o) => sum + (o.profit || 0), 0);
 
   return (
     <div className="positions-panel">
+      {modifyTarget && (
+        <ModifyModal
+          order={modifyTarget}
+          onClose={() => setModifyTarget(null)}
+          onSave={handleModifySave}
+        />
+      )}
       <div className="pos-tabs">
         {TABS.map((t) => (
           <button
@@ -64,12 +152,12 @@ const Positions = () => {
                 <th>SL</th>
                 <th>TP</th>
                 <th>Profit</th>
-                <th>Action</th>
+                <th colSpan={2}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {openOrders.length === 0 ? (
-                <tr><td colSpan={9} className="empty">No open positions</td></tr>
+                <tr><td colSpan={10} className="empty">No open positions</td></tr>
               ) : (
                 openOrders.map((o) => (
                   <tr key={o.ticket}>
@@ -85,7 +173,17 @@ const Positions = () => {
                     </td>
                     <td>
                       <button
+                        className="modify-btn"
+                        title="Modify SL/TP"
+                        onClick={() => setModifyTarget(o)}
+                      >
+                        ✎
+                      </button>
+                    </td>
+                    <td>
+                      <button
                         className="close-btn"
+                        title="Close position"
                         onClick={() => handleClose(o.ticket, o.symbol, o.type, o.lots, o.openPrice)}
                       >
                         ✕
