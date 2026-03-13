@@ -11,11 +11,12 @@ const initialState = {
 const ordersReducer = (state = initialState, action) => {
   switch (action.type) {
     case PLACE_ORDER: {
+      // Use server-assigned ticket when available (backend mode), otherwise auto-generate
       const ticket = action.payload.ticket != null ? action.payload.ticket : ++ticketCounter;
       const order = {
         ...action.payload,
         ticket,
-        openTime: action.payload.openTime || new Date().toISOString(),
+        openTime: action.payload.openTime ?? new Date().toISOString(),
         profit: action.payload.profit ?? 0,
       };
       // Avoid duplicates (backend WS may re-send an order we already have)
@@ -70,12 +71,13 @@ const ordersReducer = (state = initialState, action) => {
     }
 
     case SET_ORDERS: {
-      // Replace order lists loaded from the backend (undefined keys are left unchanged)
+      // Only replace the keys that are explicitly provided in the payload.
+      const { open, pending, history } = action.payload;
       return {
         ...state,
-        ...(action.payload.open    !== undefined && { openOrders:    action.payload.open }),
-        ...(action.payload.pending !== undefined && { pendingOrders: action.payload.pending }),
-        ...(action.payload.history !== undefined && { history:       action.payload.history }),
+        ...(open    !== undefined && { openOrders:    open }),
+        ...(pending !== undefined && { pendingOrders: pending }),
+        ...(history !== undefined && { history }),
       };
     }
 

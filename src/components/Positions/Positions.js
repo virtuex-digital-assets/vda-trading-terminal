@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { closeOrder, modifyOrder, cancelPendingOrder, addLog, updateAccount, addHistoryOrder } from '../../store/actions';
 import backendBridge from '../../services/backendBridge';
+import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
 import './Positions.css';
 
 const TABS = ['Positions', 'Orders', 'History'];
@@ -92,11 +93,11 @@ const Positions = () => {
   const { quotes } = useSelector((s) => s.market);
   const { balance } = useSelector((s) => s.account);
 
-    const handleClose = async (ticket, symbol, type, lots, openPrice) => {
+  const handleClose = async (ticket, symbol, type, lots, openPrice) => {
     const q = quotes[symbol] || {};
     const closePrice = type === 'BUY' ? q.bid : q.ask;
     const order = openOrders.find((o) => o.ticket === ticket);
-    const profit = order ? order.profit : 0;
+    const profit = order?.profit ?? 0;
 
     setCloseError('');
     setClosingTicket(ticket);

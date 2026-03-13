@@ -68,12 +68,19 @@ const OrderPanel = () => {
     };
 
     if (backendBridge.isConfigured()) {
+      // ── Live backend mode ───────────────────────────────────────────────
+      setSubmitError('');
       setSubmitting(true);
       try {
-        const confirmed = await backendBridge.placeOrder(order);
-        // Dispatch with the backend-assigned ticket so Redux state matches.
-        dispatch(placeOrder(confirmed));
-        dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
+        const placed = await backendBridge.placeOrder(order);
+        // Dispatch with server-assigned ticket so UI reflects backend state
+        dispatch(placeOrder(placed));
+        dispatch(
+          addLog(
+            'info',
+            `Order placed: ${placed.type} ${placed.lots} ${placed.symbol} @ ${formatPrice(placed.symbol, placed.openPrice)} #${placed.ticket}`
+          )
+        );
         setPrice('');
         setComment('');
       } catch (err) {
@@ -84,7 +91,7 @@ const OrderPanel = () => {
         setSubmitting(false);
       }
     } else {
-      // Simulator / offline mode – dispatch directly to Redux.
+      // ── Demo / simulator mode ────────────────────────────────────────────
       dispatch(placeOrder(order));
       dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
       setPrice('');

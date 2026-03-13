@@ -257,7 +257,8 @@ class MT4Bridge {
     this._ws.onopen = () => {
       store.dispatch(setConnectionStatus({ status: 'connected', broker: url }));
       store.dispatch(addLog('info', 'Connected to MT4 bridge'));
-      const token = this._authToken || localStorage.getItem('vda_token');
+      // Authenticate with JWT if available
+      const token = localStorage.getItem('vda_token');
       if (token) {
         this._ws.send(JSON.stringify({ type: 'auth', token }));
       }
@@ -294,6 +295,7 @@ class MT4Bridge {
       case 'auth_ok':
         store.dispatch(setConnectionStatus({ status: 'connected', broker: msg.name || 'VDA Backend' }));
         store.dispatch(addLog('info', `Authenticated as ${msg.role} — ${msg.name}`));
+        // Request open orders from backend after successful auth
         if (this._ws && this._ws.readyState === WebSocket.OPEN) {
           this._ws.send(JSON.stringify({ type: 'get_orders' }));
         }
@@ -305,7 +307,7 @@ class MT4Bridge {
         store.dispatch(updateQuote(msg.symbol, msg.bid, msg.ask, msg.time));
         break;
       case 'candles':
-        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data));
+        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data || msg.candles));
         break;
       case 'candle':
         store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data || msg.candle));

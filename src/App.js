@@ -20,7 +20,7 @@ import './components/shared.css';
 import './App.css';
 
 const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
-const API_URL        = process.env.REACT_APP_API_URL || '';
+const API_URL        = process.env.REACT_APP_API_URL        || '';
 
 const AppInner = () => {
   // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin'
@@ -28,14 +28,19 @@ const AppInner = () => {
   const [userRole,  setUserRole]  = useState(null);   // null = not logged in
   const [showLogin, setShowLogin] = useState(false);
 
-  // ── Bridge / simulator startup ─────────────────────────────────────────
+  // ── Market data bridge ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!backendBridge.isConfigured()) {
-      if (MT4_BRIDGE_URL) {
-        mt4Bridge.connect(MT4_BRIDGE_URL);
-      } else {
-        mt4Bridge.startSimulator();
-      }
+    if (backendBridge.isConfigured()) {
+      // Connect to backend WebSocket (market data + real-time updates).
+      // The simulator is NOT started when a live backend is configured.
+      backendBridge.connect();
+      return () => backendBridge.disconnect();
+    }
+    // Standalone / demo mode – use the built-in market simulator.
+    if (MT4_BRIDGE_URL) {
+      mt4Bridge.connect(MT4_BRIDGE_URL);
+    } else {
+      mt4Bridge.startSimulator();
     }
     return () => mt4Bridge.disconnect();
   }, []);
@@ -71,6 +76,7 @@ const AppInner = () => {
       if (user.role === 'super_admin') setAppMode('superadmin');
       else if (user.role === 'admin')  setAppMode('broker');
     }
+  // eslint-disable-next-line
   }, []);
 
   const handleLogin = async (role, token) => {
@@ -80,10 +86,35 @@ const AppInner = () => {
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin')  setAppMode('broker');
 
+    if (role === 'super_admin') setAppMode('superadmin');
+    else if (role === 'admin')  setAppMode('broker');
+
     if (token && backendBridge.isConfigured()) {
       backendBridge.setToken(token);
       mt4Bridge.stopSimulator();
-      await backendBridge.initialize();
+
+      // Load initial account state from REST
+      try {
+        const account = await backendBridge.loadAccount();
+        store.dispatch(updateAccount(account));
+      } catch (err) {
+        store.dispatch(addLog('warn', `Could not load account: ${err.message}`));
+      }
+
+      // Load open/pending orders and history from REST
+      try {
+        const [ordersData, history] = await Promise.all([
+          backendBridge.loadOrders(),
+          backendBridge.loadHistory(),
+        ]);
+        store.dispatch(setOrders(
+          ordersData.open    || [],
+          ordersData.pending || [],
+          history            || [],
+        ));
+      } catch (err) {
+        store.dispatch(addLog('warn', `Could not load orders: ${err.message}`));
+      }
     }
   };
 
@@ -110,10 +141,10 @@ const AppInner = () => {
 
   return (
     <div className="terminal-root">
-      {/* ── Login overlay ─────────────────────────────────────────── */}
+      {/* ── Login overlay ─────────────────────────────────────────────── */}
       {showLogin && <Login onLogin={handleLogin} />}
 
-      {/* ── Top bar ───────────────────────────────────────────────── */}
+      {/* ── Top bar ───────────────────────────────────────────────────── */}
       <header className="top-bar">
         <span className="logo">VDA</span>
         <span className="logo-sub">{modeLabel[appMode] || modeLabel.terminal}</span>
@@ -178,13 +209,13 @@ const AppInner = () => {
         </div>
       </header>
 
-      {/* ── CRM view ──────────────────────────────────────────────── */}
+      {/* ── CRM view ──────────────────────────────────────────────────── */}
       {appMode === 'crm' && <CRMView />}
 
-      {/* ── Market Feed ───────────────────────────────────────────── */}
+      {/* ── Market Feed ───────────────────────────────────────────────── */}
       {appMode === 'feed' && <MarketFeed />}
 
-      {/* ── Broker risk monitor ───────────────────────────────────── */}
+      {/* ── Broker risk monitor ───────────────────────────────────────── */}
       {appMode === 'broker' && (
         <div className="broker-view">
           <BrokerMonitor />
@@ -198,7 +229,7 @@ const AppInner = () => {
         </div>
       )}
 
-      {/* ── Trading terminal layout ───────────────────────────────── */}
+      {/* ── Trading terminal layout ────────────────────────────────────── */}
       {appMode === 'terminal' && (
         <div className="main-layout">
           {/* Left sidebar: Market Watch + Account */}

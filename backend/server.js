@@ -72,14 +72,16 @@ const httpServer = http.createServer(app);
 const { startWsServer } = require('./services/wsServer');
 startWsServer(httpServer);
 
-httpServer.listen(config.port, () => {
-  console.log(`VDA Trading Terminal – Backend Server`);
-  console.log(`  REST API  → http://localhost:${config.port}/api`);
-  console.log(`  WebSocket → ws://localhost:${config.port}`);
-  console.log(`  Demo:  super@vda.trade  / Super1234!  (super_admin)`);
-  console.log(`  Demo:  admin@vda.trade  / Admin1234!  (admin)`);
-  console.log(`  Demo:  demo@vda.trade   / Demo1234!   (trader)`);
-});
+if (require.main === module) {
+  httpServer.listen(config.port, () => {
+    console.log(`VDA Trading Terminal – Backend Server`);
+    console.log(`  REST API  → http://localhost:${config.port}/api`);
+    console.log(`  WebSocket → ws://localhost:${config.port}`);
+    console.log(`  Demo:  super@vda.trade  / Super1234!  (super_admin)`);
+    console.log(`  Demo:  admin@vda.trade  / Admin1234!  (admin)`);
+    console.log(`  Demo:  demo@vda.trade   / Demo1234!   (trader)`);
+  });
+}
 
 module.exports = app;          // exported for testing
 module.exports.httpServer = httpServer; // allow tests to close the server
