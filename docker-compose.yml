@@ -1,5 +1,20 @@
 version: "3.9"
 
+# VDA Trading Terminal – Full Platform Docker Compose
+#
+# Services:
+#   backend   → Express REST API + WebSocket price feed  (port 5000)
+#   frontend  → React trading terminal (nginx)           (port 80)
+#   crm       → CRM React app (nginx)                    (port 8080)
+#
+# Quick start:
+#   docker compose up --build
+#
+# Demo accounts:
+#   Super Admin: super@vda.trade  / Super1234!
+#   Admin:       admin@vda.trade  / Admin1234!
+#   Trader:      demo@vda.trade   / Demo1234!
+
 services:
   # ── Backend API + WebSocket server ──────────────────────────────────────
   backend:
@@ -12,18 +27,19 @@ services:
     environment:
       NODE_ENV: production
       PORT: "5000"
+      CORS_ORIGINS: "http://localhost,http://localhost:80,http://localhost:8080"
     ports:
       - "5000:5000"
     networks:
       - vda-net
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 15s
+      timeout: 5s
+      retries: 5
       start_period: 10s
 
-  # ── React frontend (nginx) ────────────────────────────────────────────
+  # ── React trading terminal (nginx) ───────────────────────────────────────
   frontend:
     build:
       context: .
@@ -37,6 +53,30 @@ services:
         condition: service_healthy
     networks:
       - vda-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── CRM System (nginx) ────────────────────────────────────────────────────
+  crm:
+    build:
+      context: .
+      dockerfile: Dockerfile.crm
+    container_name: vda-crm
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    networks:
+      - vda-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
 networks:
   vda-net:

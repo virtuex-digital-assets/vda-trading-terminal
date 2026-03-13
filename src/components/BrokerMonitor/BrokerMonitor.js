@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { formatProfit } from '../../utils/formatters';
+import backendBridge from '../../services/backendBridge';
 import './BrokerMonitor.css';
 
 /**
@@ -12,16 +13,51 @@ import './BrokerMonitor.css';
  *  • Total floating P&L
  *
  * In standalone mode this reads from the Redux store (all positions are
- * single-account).  When connected to the backend the data is supplemented
- * via the /api/admin/risk endpoint.
+ * single-account).  When connected to the backend the data is fetched from
+ * the /api/admin/risk, /api/admin/accounts, and /api/admin/orders endpoints.
  */
 const BrokerMonitor = () => {
-  const { openOrders } = useSelector((s) => s.orders);
-  const account        = useSelector((s) => s.account);
-  const { quotes }     = useSelector((s) => s.market);
-  const [tab, setTab]  = useState('exposure'); // 'exposure' | 'accounts' | 'marginCall'
+  const { openOrders: reduxOrders } = useSelector((s) => s.orders);
+  const account                     = useSelector((s) => s.account);
+  const { quotes }                  = useSelector((s) => s.market);
+  const [tab, setTab]               = useState('exposure');
 
-  // ── Aggregate symbol exposure ────────────────────────────────────────────
+  // Backend-sourced data (when REACT_APP_API_URL is configured)
+  const [riskData,     setRiskData]     = useState(null);
+  const [allAccounts,  setAllAccounts]  = useState(null);
+  const [allOrders,    setAllOrders]    = useState(null);
+  const [loadError,    setLoadError]    = useState('');
+
+  const fetchAdminData = useCallback(async () => {
+    if (!backendBridge.isConfigured()) return;
+    try {
+      const [risk, accounts, orders] = await Promise.all([
+        backendBridge.getRisk(),
+        backendBridge.listAccounts(),
+        backendBridge.listAllOrders(),
+      ]);
+      setRiskData(risk);
+      setAllAccounts(accounts);
+      setAllOrders(orders);
+      setLoadError('');
+    } catch (err) {
+      setLoadError(err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!backendBridge.isConfigured()) return;
+    fetchAdminData();
+    const interval = setInterval(fetchAdminData, 5000);
+    return () => clearInterval(interval);
+  }, [fetchAdminData]);
+
+  // ── Derive display data ─────────────────────────────────────────────────
+
+  // Use backend data when available, fall back to Redux store
+  const openOrders = allOrders || reduxOrders;
+
+  // Aggregate symbol exposure from orders
   const exposureMap = {};
   openOrders.forEach((order) => {
     if (!exposureMap[order.symbol]) {
@@ -39,18 +75,31 @@ const BrokerMonitor = () => {
   const totalLots  = openOrders.reduce((s, o) => s + o.lots, 0);
   const atRisk     = account.marginLevel > 0 && account.marginLevel < 150;
 
-  // ── Account snapshot (single account in frontend mode) ──────────────────
-  const accountRows = [{
-    login:       account.login,
-    balance:     account.balance,
-    equity:      account.equity,
-    margin:      account.margin,
-    marginLevel: account.marginLevel,
-    profit:      account.profit,
-    openOrders:  openOrders.length,
-  }];
+  // Account rows: backend list (multiple accounts) or single Redux account
+  const accountRows = allAccounts
+    ? allAccounts.map((a) => ({
+        login:       a.login,
+        balance:     a.balance,
+        equity:      a.equity,
+        margin:      a.margin,
+        marginLevel: a.marginLevel,
+        profit:      a.profit,
+        // allOrders have accountId; filter by account; fall back to full count
+        openOrders:  allOrders
+          ? allOrders.filter((o) => o.accountId === a.id).length
+          : 0,
+      }))
+    : [{
+        login:       account.login,
+        balance:     account.balance,
+        equity:      account.equity,
+        margin:      account.margin,
+        marginLevel: account.marginLevel,
+        profit:      account.profit,
+        openOrders:  reduxOrders.length,
+      }];
 
-  // ── Margin-call risk orders (SL very close to current price) ─────────────
+  // Margin-call risk orders (SL very close to current price)
   const marginRiskOrders = openOrders.filter((o) => {
     if (!o.sl) return false;
     const q = quotes[o.symbol];
@@ -77,6 +126,12 @@ const BrokerMonitor = () => {
           </span>
           {atRisk && (
             <span className="bm-alert">⚠ LOW MARGIN LEVEL: {account.marginLevel.toFixed(1)}%</span>
+          )}
+          {loadError && (
+            <span className="bm-alert" title={loadError}>⚠ API error</span>
+          )}
+          {backendBridge.isConfigured() && (
+            <button className="bm-refresh-btn" onClick={fetchAdminData} title="Refresh data">↺</button>
           )}
         </div>
       </div>

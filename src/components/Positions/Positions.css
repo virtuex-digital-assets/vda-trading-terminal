@@ -256,3 +256,12 @@
 }
 
 .modal-btn.save:hover { background: #4488cc; color: #fff; }
+
+.pos-error {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #ff6b6b;
+  background: rgba(255, 100, 100, 0.1);
+  border-left: 2px solid #ff6b6b;
+  margin: 2px 4px;
+}

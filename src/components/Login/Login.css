@@ -158,3 +158,37 @@
   text-align: center;
   margin: 0;
 }
+
+/* Login / Register tab toggle */
+.login-tabs {
+  display: flex;
+  gap: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #2a2a50;
+}
+
+.login-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #5566aa;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  letter-spacing: 0.4px;
+  font-family: inherit;
+}
+
+.login-tab.active {
+  background: #2233aa;
+  color: #ffffff;
+}
+
+.login-tab:not(.active):hover {
+  background: #1c1c38;
+  color: #aabbee;
+}
+
