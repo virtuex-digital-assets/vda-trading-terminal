@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { closeOrder, modifyOrder, addLog, updateAccount } from '../../store/actions';
 import { closeOrder, modifyOrder, cancelPendingOrder, addLog, updateAccount, addHistoryOrder } from '../../store/actions';
 import backendBridge from '../../services/backendBridge';
 import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
@@ -87,29 +86,14 @@ const Positions = () => {
   const dispatch = useDispatch();
   const [tab, setTab] = useState('Positions');
   const [modifyTarget, setModifyTarget] = useState(null);
+  const [closeError, setCloseError] = useState('');
+  const [closingTicket, setClosingTicket] = useState(null);
+  const [modifyError, setModifyError] = useState('');
   const { openOrders, pendingOrders, history } = useSelector((s) => s.orders);
   const { quotes } = useSelector((s) => s.market);
   const { balance } = useSelector((s) => s.account);
 
   const handleClose = async (ticket, symbol, type, lots, openPrice) => {
-    if (backendBridge.isConfigured()) {
-      try {
-        await backendBridge.closeOrder(ticket);
-      } catch (err) {
-        dispatch(addLog('error', `Close order failed: ${err.message}`));
-      }
-      return;
-    }
-    const q = quotes[symbol] || {};
-    const closePrice = type === 'BUY' ? q.bid : q.ask;
-    const order = openOrders.find((o) => o.ticket === ticket);
-    const profit = order ? order.profit : 0;
-    const newBalance = parseFloat((balance + profit).toFixed(2));
-    dispatch(closeOrder(ticket));
-    dispatch(updateAccount({ balance: newBalance }));
-    dispatch(
-      addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(profit)}`)
-    );
     const q = quotes[symbol] || {};
     const closePrice = type === 'BUY' ? q.bid : q.ask;
     const order = openOrders.find((o) => o.ticket === ticket);
@@ -167,13 +151,6 @@ const Positions = () => {
     if (backendBridge.isConfigured()) {
       try {
         await backendBridge.modifyOrder(ticket, sl, tp);
-      } catch (err) {
-        dispatch(addLog('error', `Modify order failed: ${err.message}`));
-      }
-      return;
-    }
-    dispatch(modifyOrder(ticket, sl, tp));
-    dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
         dispatch(modifyOrder(ticket, sl, tp));
         dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
         return true;

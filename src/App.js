@@ -3,6 +3,7 @@ import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
 import backendBridge from './services/backendBridge';
+import { updateAccount, addLog, setOrders } from './store/actions';
 
 import MarketWatch    from './components/MarketWatch/MarketWatch';
 import Chart          from './components/Chart/Chart';
@@ -30,14 +31,6 @@ const AppInner = () => {
 
   // ── Market data bridge ─────────────────────────────────────────────────
   useEffect(() => {
-    // Use the backend bridge for real-time data when the API is configured,
-    // otherwise fall back to the built-in MT4 simulator.
-    if (!backendBridge.isConfigured()) {
-      if (MT4_BRIDGE_URL) {
-        mt4Bridge.connect(MT4_BRIDGE_URL);
-      } else {
-        mt4Bridge.startSimulator();
-      }
     if (backendBridge.isConfigured()) {
       // Connect to backend WebSocket (market data + real-time updates).
       // The simulator is NOT started when a live backend is configured.
@@ -53,7 +46,6 @@ const AppInner = () => {
     return () => mt4Bridge.disconnect();
   }, []);
 
-  // ── Auto-login from stored JWT ────────────────────────────────────────
   // ── Auto-login from stored JWT ─────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('vda_token');
@@ -95,15 +87,10 @@ const AppInner = () => {
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin')  setAppMode('broker');
 
-    if (role === 'super_admin') setAppMode('superadmin');
-    else if (role === 'admin')  setAppMode('broker');
-
     if (token && backendBridge.isConfigured()) {
       backendBridge.setToken(token);
       mt4Bridge.stopSimulator();
 
-    if (role === 'super_admin') setAppMode('superadmin');
-    else if (role === 'admin') setAppMode('broker');
       // Load initial account state from REST
       try {
         const account = await backendBridge.loadAccount();

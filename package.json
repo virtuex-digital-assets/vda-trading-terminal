@@ -5,7 +5,6 @@
   "main": "index.js",
   "homepage": "https://virtuex-digital-assets.github.io/vda-trading-terminal",
   "private": true,
-  "homepage": "https://virtuex-digital-assets.github.io/vda-trading-terminal",
   "scripts": {
     "start": "NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
     "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
