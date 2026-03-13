@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { formatProfit } from '../../utils/formatters';
 import {
@@ -12,6 +12,7 @@ import CRMView from '../CRM/CRMView';
 import BrokerMonitor from '../BrokerMonitor/BrokerMonitor';
 import MarketFeed from '../MarketFeed/MarketFeed';
 import Terminal from '../Terminal/Terminal';
+import backendBridge from '../../services/backendBridge';
 import './SuperAdmin.css';
 
 /**
@@ -46,6 +47,7 @@ const DEFAULT_SYMBOLS = [
 ];
 
 const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'settings'];
+const TABS = ['overview', 'accounts', 'symbols', 'trades', 'audit', 'settings'];
 const TAB_LABELS = {
   overview: '📊 Overview',
   crm:      '👥 CRM',
@@ -55,6 +57,7 @@ const TAB_LABELS = {
   accounts: '👤 Accounts',
   symbols:  '📈 Symbols',
   trades:   '📋 Trades',
+  audit:    '🔎 Audit Log',
   settings: '⚙️ Settings',
 };
 
@@ -97,6 +100,43 @@ const SuperAdmin = () => {
   const [adjAmount, setAdjAmount]  = useState('');
   const [adjNote,   setAdjNote]    = useState('');
   const [msg,       setMsg]        = useState('');
+  const [auditLog,  setAuditLog]   = useState([]);
+  const [backendUsers, setBackendUsers] = useState([]);
+
+  // ── Fetch backend data when API is configured ────────────────────────────
+  useEffect(() => {
+    if (!backendBridge.isConfigured()) return;
+
+    // Load symbols from backend
+    backendBridge.getSymbols()
+      .then((syms) => {
+        if (Array.isArray(syms)) {
+          setSymbols(syms.map((s) => ({
+            symbol:     s.symbol,
+            spread:     s.spread,
+            leverageCap: s.leverageCap,
+            active:     s.active,
+            description: s.description,
+            contractSize: s.contractSize,
+            tradingHours: s.tradingHours,
+          })));
+        }
+      })
+      .catch((err) => { console.warn('[SuperAdmin] Failed to load symbols from backend:', err.message); });
+
+    // Load users from backend (super_admin endpoint)
+    backendBridge.getUsers()
+      .then((users) => { if (Array.isArray(users)) setBackendUsers(users); })
+      .catch((err) => { console.warn('[SuperAdmin] Failed to load users from backend:', err.message); });
+  }, []); // eslint-disable-line
+
+  // ── Refresh audit log when audit tab is opened ───────────────────────────
+  useEffect(() => {
+    if (tab !== 'audit' || !backendBridge.isConfigured()) return;
+    backendBridge.getAuditLog(200)
+      .then((entries) => { if (Array.isArray(entries)) setAuditLog(entries); })
+      .catch((err) => { console.warn('[SuperAdmin] Failed to load audit log:', err.message); });
+  }, [tab]);
 
   // ── Flash message helper ─────────────────────────────────────────────────
   const flash = useCallback((text) => {
@@ -151,15 +191,35 @@ const SuperAdmin = () => {
     }
   };
 
-  // ── Balance adjustment (demo account) ────────────────────────────────────
-  const handleAdjustBalance = () => {
+  // ── Balance adjustment ────────────────────────────────────────────────────
+  const handleAdjustBalance = async () => {
     const amount = parseFloat(adjAmount);
     if (isNaN(amount)) { flash('Enter a valid amount.'); return; }
+
+    // Try backend first when configured
+    if (backendBridge.isConfigured()) {
+      try {
+        // Find the account of the matched user
+        const accounts = await backendBridge.getAdminAccounts();
+        const acct = accounts.find((a) =>
+          a.login === adjTarget || (adjTarget && a.id === adjTarget));
+        if (acct) {
+          await backendBridge.adjustBalance(acct.id, amount, adjNote);
+          flash(`Balance adjusted by ${amount >= 0 ? '+' : ''}${amount.toFixed(2)} for account ${acct.login}.`);
+          setAdjTarget(''); setAdjAmount(''); setAdjNote('');
+          return;
+        }
+      } catch (err) {
+        flash(`Backend error: ${err.message}`);
+        return;
+      }
+    }
+
+    // Fallback: local demo account adjustment
     dispatch({ type: UPDATE_ACCOUNT, payload: { balance: Math.max(0, account.balance + amount) } });
     dispatch({ type: ADD_LOG, payload: `[ADMIN] Balance adjusted by ${amount >= 0 ? '+' : ''}${amount.toFixed(2)} — ${adjNote || 'admin adjustment'}` });
 
     if (adjTarget) {
-      // Also record in CRM if client matches
       const client = crmClients.find(
         (c) => c.name.toLowerCase().includes(adjTarget.toLowerCase()) ||
                c.email.toLowerCase().includes(adjTarget.toLowerCase())
@@ -176,11 +236,17 @@ const SuperAdmin = () => {
   };
 
   // ── Symbol toggle ────────────────────────────────────────────────────────
-  const handleToggleSymbol = (sym) => {
+  const handleToggleSymbol = async (sym) => {
+    const cur = symbols.find((s) => s.symbol === sym);
+    const newActive = cur ? !cur.active : true;
     setSymbols((prev) =>
-      prev.map((s) => s.symbol === sym ? { ...s, active: !s.active } : s)
+      prev.map((s) => s.symbol === sym ? { ...s, active: newActive } : s)
     );
-    dispatch({ type: ADD_LOG, payload: `[ADMIN] Symbol ${sym} toggled` });
+    dispatch({ type: ADD_LOG, payload: `[ADMIN] Symbol ${sym} ${newActive ? 'enabled' : 'disabled'}` });
+    if (backendBridge.isConfigured()) {
+      backendBridge.updateSymbol(sym, { active: newActive })
+        .catch((err) => flash(`Symbol update failed: ${err.message}`));
+    }
   };
 
   const handleSpreadChange = (sym, value) => {
@@ -191,12 +257,30 @@ const SuperAdmin = () => {
     );
   };
 
+  const handleSpreadBlur = (sym) => {
+    if (!backendBridge.isConfigured()) return;
+    const cur = symbols.find((s) => s.symbol === sym);
+    if (cur) {
+      backendBridge.updateSymbol(sym, { spread: cur.spread })
+        .catch((err) => flash(`Spread update failed: ${err.message}`));
+    }
+  };
+
   const handleLevCapChange = (sym, value) => {
     const cap = parseInt(value, 10);
     if (isNaN(cap) || cap < 1) return;
     setSymbols((prev) =>
       prev.map((s) => s.symbol === sym ? { ...s, leverageCap: cap } : s)
     );
+  };
+
+  const handleLevCapBlur = (sym) => {
+    if (!backendBridge.isConfigured()) return;
+    const cur = symbols.find((s) => s.symbol === sym);
+    if (cur) {
+      backendBridge.updateSymbol(sym, { leverageCap: cur.leverageCap })
+        .catch((err) => flash(`Leverage update failed: ${err.message}`));
+    }
   };
 
   // ── Save settings ─────────────────────────────────────────────────────────
@@ -426,6 +510,7 @@ const SuperAdmin = () => {
                         step="0.1"
                         value={s.spread}
                         onChange={(e) => handleSpreadChange(s.symbol, e.target.value)}
+                        onBlur={() => handleSpreadBlur(s.symbol)}
                       />
                     </td>
                     <td>
@@ -436,6 +521,7 @@ const SuperAdmin = () => {
                         step="1"
                         value={s.leverageCap}
                         onChange={(e) => handleLevCapChange(s.symbol, e.target.value)}
+                        onBlur={() => handleLevCapBlur(s.symbol)}
                       />
                     </td>
                     <td>

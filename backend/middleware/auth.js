@@ -27,12 +27,20 @@ function authMiddleware(req, res, next) {
   }
 }
 
-/** Only allow users with role === 'admin'. */
+/** Only allow users with role === 'admin' or 'super_admin'. */
 function adminOnly(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
 }
 
-module.exports = { authMiddleware, adminOnly };
+/** Only allow users with role === 'super_admin'. */
+function superAdminOnly(req, res, next) {
+  if (!req.user || req.user.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super admin access required' });
+  }
+  next();
+}
+
+module.exports = { authMiddleware, adminOnly, superAdminOnly };
