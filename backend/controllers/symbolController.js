@@ -155,8 +155,8 @@ function createSymbol(req, res) {
 
 /**
  * DELETE /api/symbols/:symbol
- * Remove a custom symbol (admin only – cannot delete built-in symbols that
- * have open orders).
+ * Remove a symbol (admin only).
+ * Cannot delete symbols that have open or pending orders.
  */
 function deleteSymbol(req, res) {
   const { symbol } = req.params;
@@ -164,7 +164,7 @@ function deleteSymbol(req, res) {
     return res.status(404).json({ error: `Symbol ${symbol} not found` });
   }
 
-  // Prevent deletion if there are open orders on this symbol
+  // Prevent deletion if there are open or pending orders on this symbol
   const hasOpen = [...db.openOrders.values()].some((o) => o.symbol === symbol) ||
                   [...db.pendingOrders.values()].some((o) => o.symbol === symbol);
   if (hasOpen) {
