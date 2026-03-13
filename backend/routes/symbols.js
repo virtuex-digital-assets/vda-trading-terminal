@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { listSymbols, getCandles, updateSymbol, createSymbol, deleteSymbol } = require('../controllers/symbolController');
 const { authMiddleware, adminOnly } = require('../middleware/auth');
-const { apiLimiter, adminLimiter }  = require('../middleware/rateLimiter');
+const { adminLimiter }  = require('../middleware/rateLimiter');
 const { auditLog } = require('../middleware/auditLog');
 
 // Public endpoints – no authentication required for market data
