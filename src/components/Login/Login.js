@@ -50,11 +50,11 @@ const Login = ({ onLogin }) => {
         // Registration in demo mode falls straight through to trader role
         const e = email.toLowerCase();
         if (e.includes('superadmin') || e.includes('super_admin') || e.includes('root')) {
-          onLogin('super_admin');
+          onLogin('super_admin', null);
         } else if (e.includes('admin')) {
-          onLogin('admin');
+          onLogin('admin', null);
         } else {
-          onLogin('trader');
+          onLogin('trader', null);
         }
       }, 400);
       return;
@@ -80,7 +80,7 @@ const Login = ({ onLogin }) => {
       }
       localStorage.setItem('vda_token', data.token);
       localStorage.setItem('vda_user',  JSON.stringify(data.user));
-      onLogin(data.user.role);
+      onLogin(data.user.role, data.token);
     } catch {
       setError('Cannot reach server. Switching to demo mode.');
       setIsDemo(true);
@@ -89,9 +89,9 @@ const Login = ({ onLogin }) => {
   };
 
   const fillDemo = (role) => {
-    if (role === 'super_admin') { setEmail('superadmin@vda.trade'); setPassword('SuperAdmin1!'); }
-    else if (role === 'admin')  { setEmail('admin@vda.trade');      setPassword('Admin1234!'); }
-    else                        { setEmail('demo@vda.trade');        setPassword('Demo1234!'); }
+    if (role === 'super_admin') { setEmail('super@vda.trade');  setPassword('Super1234!'); }
+    else if (role === 'admin')  { setEmail('admin@vda.trade');  setPassword('Admin1234!'); }
+    else                        { setEmail('demo@vda.trade');   setPassword('Demo1234!'); }
   };
 
   return (

@@ -9,6 +9,8 @@ import {
   MODIFY_ORDER,
   UPDATE_ORDER_PROFIT,
   CANCEL_PENDING_ORDER,
+  SET_ORDERS,
+  ADD_HISTORY_ORDER,
   UPDATE_ACCOUNT,
   SET_LEVERAGE,
   SET_CONNECTION_STATUS,
@@ -102,6 +104,41 @@ export const clearLog = () => ({ type: CLEAR_LOG });
 export const cancelPendingOrder = (ticket) => ({
   type: CANCEL_PENDING_ORDER,
   payload: ticket,
+});
+
+/**
+ * Bulk-replace the orders state from the backend (used on login / reconnect).
+ * @param {{ open: object[], pending: object[], history: object[] }} orders
+ */
+export const setOrders = (orders) => ({
+  type: SET_ORDERS,
+  payload: orders,
+});
+
+/**
+ * Prepend a single closed order to trade history (used after REST close).
+ * @param {object} order
+ * Replace all orders in the store with data loaded from the backend.
+ * @param {object[]} [open]     Open market orders
+ * @param {object[]} [pending]  Pending limit/stop orders
+ * @param {object[]} [history]  Closed trade history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: {
+    ...(open    !== undefined && { open }),
+    ...(pending !== undefined && { pending }),
+    ...(history !== undefined && { history }),
+  },
+});
+
+/**
+ * Prepend a single closed order to the history array (deduplicates by ticket).
+ * @param {object} order  Closed order object from the backend
+ */
+export const addHistoryOrder = (order) => ({
+  type: ADD_HISTORY_ORDER,
+  payload: order,
 });
 
 // ── CRM actions ────────────────────────────────────────────────────────────
