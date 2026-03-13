@@ -8,6 +8,7 @@ import {
   CLOSE_ORDER,
   MODIFY_ORDER,
   UPDATE_ORDER_PROFIT,
+  CANCEL_PENDING_ORDER,
   UPDATE_ACCOUNT,
   SET_LEVERAGE,
   SET_CONNECTION_STATUS,
@@ -97,6 +98,11 @@ export const addLog = (level, message) => ({
 });
 
 export const clearLog = () => ({ type: CLEAR_LOG });
+
+export const cancelPendingOrder = (ticket) => ({
+  type: CANCEL_PENDING_ORDER,
+  payload: ticket,
+});
 
 // ── CRM actions ────────────────────────────────────────────────────────────
 

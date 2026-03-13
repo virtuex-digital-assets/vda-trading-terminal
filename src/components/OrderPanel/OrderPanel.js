@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { placeOrder, updateAccount, addLog } from '../../store/actions';
+import { placeOrder, addLog } from '../../store/actions';
 import { formatPrice } from '../../utils/formatters';
+import { calculateMargin } from '../../utils/constants';
 import './OrderPanel.css';
 
 const ORDER_TYPES = ['BUY', 'SELL', 'BUY LIMIT', 'SELL LIMIT', 'BUY STOP', 'SELL STOP'];
@@ -11,7 +12,7 @@ const LOT_SIZES = [0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0];
 const OrderPanel = () => {
   const dispatch = useDispatch();
   const { activeSymbol, quotes } = useSelector((s) => s.market);
-  const { balance, leverage } = useSelector((s) => s.account);
+  const { balance, freeMargin, leverage } = useSelector((s) => s.account);
 
   const [orderType, setOrderType] = useState('BUY');
   const [lots, setLots] = useState(0.1);
@@ -29,10 +30,10 @@ const OrderPanel = () => {
     : parseFloat(price) || 0;
 
   const requiredMargin = openPrice
-    ? parseFloat(((openPrice * lots * 100000) / leverage).toFixed(2))
+    ? calculateMargin(activeSymbol, parseFloat(lots), openPrice, leverage)
     : 0;
 
-  const canTrade = balance >= requiredMargin && openPrice > 0 && lots > 0;
+  const canTrade = freeMargin >= requiredMargin && openPrice > 0 && lots > 0;
 
   const submitOrder = (type) => {
     const isBuyType = type.startsWith('BUY');
@@ -45,8 +46,8 @@ const OrderPanel = () => {
       return;
     }
 
-    const margin = parseFloat(((execPrice * lots * 100000) / leverage).toFixed(2));
-    if (balance < margin) {
+    const margin = calculateMargin(activeSymbol, parseFloat(lots), execPrice, leverage);
+    if (freeMargin < margin) {
       dispatch(addLog('error', `Insufficient margin to place ${type} ${lots} ${activeSymbol}`));
       return;
     }
@@ -62,7 +63,7 @@ const OrderPanel = () => {
     };
 
     dispatch(placeOrder(order));
-    dispatch(updateAccount({ margin: parseFloat(margin.toFixed(2)) }));
+    // Note: account margin is recalculated automatically on each simulator tick
     dispatch(
       addLog(
         'info',

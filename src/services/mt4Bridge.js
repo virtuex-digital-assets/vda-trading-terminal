@@ -16,11 +16,14 @@ import {
   addCandle,
   updateAccount,
   updateOrderProfit,
+  closeOrder,
+  placeOrder,
   setConnectionStatus,
   addLog,
 } from '../store/actions';
+import { CANCEL_PENDING_ORDER } from '../store/actions/actionTypes';
 import { generateSimulatedCandles, simulateNextCandle } from '../utils/marketSimulator';
-import { getSpread } from '../utils/constants';
+import { getSpread, calculateProfit, calculateMargin, getPricePrecision } from '../utils/constants';
 
 const RECONNECT_DELAY_MS = 5000;
 const CANDLE_HISTORY_COUNT = 200;
@@ -100,30 +103,110 @@ class MT4Bridge {
       store.dispatch(updateQuote(sym, quote.bid, quote.ask, quote.time));
     });
 
-    // Recalculate floating P&L for open orders
+    // ── Recalculate floating P&L for open orders ────────────────────────────
     const { openOrders } = store.getState().orders;
     const quotes = store.getState().market.quotes;
     openOrders.forEach((order) => {
       const q = quotes[order.symbol];
       if (!q) return;
       const closePrice = order.type === 'BUY' ? q.bid : q.ask;
-      const direction = order.type === 'BUY' ? 1 : -1;
-      const pipValue = order.symbol.includes('JPY') ? 0.01 : 0.0001;
-      const profit = direction * ((closePrice - order.openPrice) / pipValue) * order.lots * 1;
-      store.dispatch(updateOrderProfit(order.ticket, parseFloat(profit.toFixed(2))));
+      const profit = calculateProfit(order.symbol, order.type, order.openPrice, closePrice, order.lots);
+      store.dispatch(updateOrderProfit(order.ticket, profit));
     });
 
-    // Update account equity
+    // ── SL / TP monitoring ──────────────────────────────────────────────────
     const freshOrders = store.getState().orders.openOrders;
-    const totalProfit = freshOrders.reduce((sum, o) => sum + (o.profit || 0), 0);
-    const { balance, margin } = store.getState().account;
+    const freshQuotes = store.getState().market.quotes;
+    freshOrders.forEach((order) => {
+      const q = freshQuotes[order.symbol];
+      if (!q) return;
+      const currentPrice = order.type === 'BUY' ? q.bid : q.ask;
+
+      // Stop loss hit?
+      if (order.sl) {
+        const slHit = order.type === 'BUY' ? currentPrice <= order.sl : currentPrice >= order.sl;
+        if (slHit) {
+          const profit = calculateProfit(order.symbol, order.type, order.openPrice, order.sl, order.lots);
+          const bal = store.getState().account.balance;
+          store.dispatch(closeOrder(order.ticket));
+          store.dispatch(updateAccount({ balance: parseFloat((bal + profit).toFixed(2)) }));
+          store.dispatch(addLog('warn', `SL hit: closed #${order.ticket} ${order.type} ${order.lots} ${order.symbol} @ ${order.sl}, P&L: ${profit >= 0 ? '+' : ''}${profit}`));
+          return;
+        }
+      }
+
+      // Take profit hit?
+      if (order.tp) {
+        const tpHit = order.type === 'BUY' ? currentPrice >= order.tp : currentPrice <= order.tp;
+        if (tpHit) {
+          const profit = calculateProfit(order.symbol, order.type, order.openPrice, order.tp, order.lots);
+          const bal = store.getState().account.balance;
+          store.dispatch(closeOrder(order.ticket));
+          store.dispatch(updateAccount({ balance: parseFloat((bal + profit).toFixed(2)) }));
+          store.dispatch(addLog('info', `TP hit: closed #${order.ticket} ${order.type} ${order.lots} ${order.symbol} @ ${order.tp}, P&L: ${profit >= 0 ? '+' : ''}${profit}`));
+          return;
+        }
+      }
+    });
+
+    // ── Pending order execution ─────────────────────────────────────────────
+    const pendingOrders = store.getState().orders.pendingOrders;
+    pendingOrders.forEach((order) => {
+      const q = freshQuotes[order.symbol];
+      if (!q) return;
+
+      let triggered = false;
+      let execPrice = order.openPrice;
+
+      switch (order.type) {
+        case 'BUY LIMIT':
+          triggered = q.ask <= order.openPrice;
+          execPrice = q.ask;
+          break;
+        case 'BUY STOP':
+          triggered = q.ask >= order.openPrice;
+          execPrice = q.ask;
+          break;
+        case 'SELL LIMIT':
+          triggered = q.bid >= order.openPrice;
+          execPrice = q.bid;
+          break;
+        case 'SELL STOP':
+          triggered = q.bid <= order.openPrice;
+          execPrice = q.bid;
+          break;
+        default:
+          break;
+      }
+
+      if (triggered) {
+        // Remove pending, place as market order
+        store.dispatch({ type: CANCEL_PENDING_ORDER, payload: order.ticket });
+        const marketType = order.type.startsWith('BUY') ? 'BUY' : 'SELL';
+        store.dispatch(placeOrder({
+          ...order,
+          type: marketType,
+          openPrice: parseFloat(execPrice.toFixed(getPricePrecision(order.symbol))),
+        }));
+        store.dispatch(addLog('info', `Pending order #${order.ticket} triggered: ${order.type} → ${marketType} ${order.lots} ${order.symbol} @ ${execPrice.toFixed(5)}`));
+      }
+    });
+
+    // ── Recalculate account metrics ─────────────────────────────────────────
+    const remainingOrders = store.getState().orders.openOrders;
+    const totalProfit = remainingOrders.reduce((sum, o) => sum + (o.profit || 0), 0);
+    const { balance, leverage } = store.getState().account;
+    const totalMargin = remainingOrders.reduce((sum, o) => {
+      return sum + calculateMargin(o.symbol, o.lots, o.openPrice, leverage);
+    }, 0);
     const equity = balance + totalProfit;
-    const freeMargin = equity - margin;
-    const marginLevel = margin > 0 ? (equity / margin) * 100 : 0;
+    const freeMargin = equity - totalMargin;
+    const marginLevel = totalMargin > 0 ? (equity / totalMargin) * 100 : 0;
     store.dispatch(
       updateAccount({
         equity: parseFloat(equity.toFixed(2)),
         profit: parseFloat(totalProfit.toFixed(2)),
+        margin: parseFloat(totalMargin.toFixed(2)),
         freeMargin: parseFloat(freeMargin.toFixed(2)),
         marginLevel: parseFloat(marginLevel.toFixed(2)),
       })

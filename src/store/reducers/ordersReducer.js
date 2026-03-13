@@ -1,4 +1,4 @@
-import { PLACE_ORDER, CLOSE_ORDER, MODIFY_ORDER, UPDATE_ORDER_PROFIT } from '../actions/actionTypes';
+import { PLACE_ORDER, CLOSE_ORDER, MODIFY_ORDER, UPDATE_ORDER_PROFIT, CANCEL_PENDING_ORDER } from '../actions/actionTypes';
 
 let ticketCounter = 1000;
 
@@ -48,6 +48,13 @@ const ordersReducer = (state = initialState, action) => {
         openOrders: state.openOrders.map((o) =>
           o.ticket === ticket ? { ...o, profit } : o
         ),
+      };
+    }
+
+    case CANCEL_PENDING_ORDER: {
+      return {
+        ...state,
+        pendingOrders: state.pendingOrders.filter((o) => o.ticket !== action.payload),
       };
     }
 

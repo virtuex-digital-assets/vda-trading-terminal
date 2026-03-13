@@ -12,6 +12,7 @@ export const PLACE_ORDER = 'PLACE_ORDER';
 export const CLOSE_ORDER = 'CLOSE_ORDER';
 export const MODIFY_ORDER = 'MODIFY_ORDER';
 export const UPDATE_ORDER_PROFIT = 'UPDATE_ORDER_PROFIT';
+export const CANCEL_PENDING_ORDER = 'CANCEL_PENDING_ORDER';
 
 // Account
 export const UPDATE_ACCOUNT = 'UPDATE_ACCOUNT';
