@@ -1,7 +1,7 @@
 import marketReducer from '../store/reducers/marketReducer';
 import ordersReducer from '../store/reducers/ordersReducer';
 import accountReducer from '../store/reducers/accountReducer';
-import { UPDATE_QUOTE, SET_ACTIVE_SYMBOL, SET_TIMEFRAME, PLACE_ORDER, CLOSE_ORDER, UPDATE_ACCOUNT } from '../store/actions/actionTypes';
+import { UPDATE_QUOTE, SET_ACTIVE_SYMBOL, SET_TIMEFRAME, PLACE_ORDER, CLOSE_ORDER, UPDATE_ACCOUNT, SET_ORDERS, ADD_HISTORY_ORDER } from '../store/actions/actionTypes';
 
 describe('marketReducer', () => {
   const initial = marketReducer(undefined, {});
@@ -63,6 +63,37 @@ describe('ordersReducer', () => {
     const closedState = ordersReducer(stateWithOrder, { type: CLOSE_ORDER, payload: ticket });
     expect(closedState.openOrders).toHaveLength(0);
     expect(closedState.history).toHaveLength(1);
+  });
+
+  it('handles PLACE_ORDER with server-provided ticket', () => {
+    const order = { symbol: 'GBPUSD', type: 'BUY', lots: 0.5, openPrice: 1.27, ticket: 9999 };
+    const state = ordersReducer(initial, { type: PLACE_ORDER, payload: order });
+    expect(state.openOrders[0].ticket).toBe(9999);
+  });
+
+  it('handles SET_ORDERS', () => {
+    const open    = [{ ticket: 1, type: 'BUY',   symbol: 'EURUSD', lots: 0.1, openPrice: 1.085, profit: 0 }];
+    const pending = [{ ticket: 2, type: 'BUY LIMIT', symbol: 'GBPUSD', lots: 0.1, openPrice: 1.27 }];
+    const history = [{ ticket: 3, type: 'SELL', symbol: 'USDJPY', lots: 0.2, openPrice: 147.5, closeTime: '2024-01-01T00:00:00Z', profit: 50 }];
+    const state = ordersReducer(initial, { type: SET_ORDERS, payload: { open, pending, history } });
+    expect(state.openOrders).toHaveLength(1);
+    expect(state.pendingOrders).toHaveLength(1);
+    expect(state.history).toHaveLength(1);
+    expect(state.openOrders[0].ticket).toBe(1);
+  });
+
+  it('handles ADD_HISTORY_ORDER', () => {
+    const closed = { ticket: 5, type: 'BUY', symbol: 'EURUSD', lots: 0.1, openPrice: 1.08, closeTime: '2024-02-01T00:00:00Z', profit: 20 };
+    const state = ordersReducer(initial, { type: ADD_HISTORY_ORDER, payload: closed });
+    expect(state.history).toHaveLength(1);
+    expect(state.history[0].ticket).toBe(5);
+  });
+
+  it('ADD_HISTORY_ORDER ignores duplicates', () => {
+    const closed = { ticket: 5, type: 'BUY', symbol: 'EURUSD', lots: 0.1, openPrice: 1.08, closeTime: '2024-02-01T00:00:00Z', profit: 20 };
+    const s1 = ordersReducer(initial, { type: ADD_HISTORY_ORDER, payload: closed });
+    const s2 = ordersReducer(s1, { type: ADD_HISTORY_ORDER, payload: closed });
+    expect(s2.history).toHaveLength(1);
   });
 });
 

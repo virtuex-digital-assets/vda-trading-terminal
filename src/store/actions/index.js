@@ -9,6 +9,8 @@ import {
   MODIFY_ORDER,
   UPDATE_ORDER_PROFIT,
   CANCEL_PENDING_ORDER,
+  SET_ORDERS,
+  ADD_HISTORY_ORDER,
   UPDATE_ACCOUNT,
   SET_LEVERAGE,
   SET_CONNECTION_STATUS,
@@ -102,6 +104,19 @@ export const clearLog = () => ({ type: CLEAR_LOG });
 export const cancelPendingOrder = (ticket) => ({
   type: CANCEL_PENDING_ORDER,
   payload: ticket,
+});
+
+// ── Backend order sync actions ────────────────────────────────────────────
+/** Replace all orders from the backend (used after login or full refresh). */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: { open, pending, history },
+});
+
+/** Add a single closed order to history (e.g. from WS broadcast). */
+export const addHistoryOrder = (order) => ({
+  type: ADD_HISTORY_ORDER,
+  payload: order,
 });
 
 // ── CRM actions ────────────────────────────────────────────────────────────

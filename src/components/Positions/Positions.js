@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { closeOrder, modifyOrder, addLog, updateAccount } from '../../store/actions';
 import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
+import backendBridge from '../../services/backendBridge';
 import './Positions.css';
 
 const TABS = ['Positions', 'Orders', 'History'];
@@ -85,26 +86,76 @@ const Positions = () => {
   const dispatch = useDispatch();
   const [tab, setTab] = useState('Positions');
   const [modifyTarget, setModifyTarget] = useState(null);
+  const [closingTicket, setClosingTicket] = useState(null);
+  const [closeError, setCloseError] = useState('');
+  const [modifyError, setModifyError] = useState('');
   const { openOrders, pendingOrders, history } = useSelector((s) => s.orders);
   const { quotes } = useSelector((s) => s.market);
   const { balance } = useSelector((s) => s.account);
 
-  const handleClose = (ticket, symbol, type, lots, openPrice) => {
+  const handleClose = async (ticket, symbol, type, lots, openPrice) => {
     const q = quotes[symbol] || {};
     const closePrice = type === 'BUY' ? q.bid : q.ask;
     const order = openOrders.find((o) => o.ticket === ticket);
     const profit = order ? order.profit : 0;
-    const newBalance = parseFloat((balance + profit).toFixed(2));
-    dispatch(closeOrder(ticket));
-    dispatch(updateAccount({ balance: newBalance }));
-    dispatch(
-      addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(profit)}`)
-    );
+
+    setCloseError('');
+    setClosingTicket(ticket);
+
+    if (backendBridge.isConfigured()) {
+      // ── Live backend mode ───────────────────────────────────────────────
+      try {
+        const closed = await backendBridge.closeOrder(ticket);
+        dispatch(closeOrder(ticket));
+        if (closed.balance != null) {
+          dispatch(updateAccount({ balance: closed.balance }));
+        } else {
+          dispatch(updateAccount({ balance: parseFloat((balance + profit).toFixed(2)) }));
+        }
+        dispatch(
+          addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(closed.profit || profit)}`)
+        );
+      } catch (err) {
+        const msg = `Failed to close #${ticket}: ${err.message}`;
+        setCloseError(msg);
+        dispatch(addLog('error', msg));
+      } finally {
+        setClosingTicket(null);
+      }
+    } else {
+      // ── Demo / simulator mode ────────────────────────────────────────────
+      const newBalance = parseFloat((balance + profit).toFixed(2));
+      dispatch(closeOrder(ticket));
+      dispatch(updateAccount({ balance: newBalance }));
+      dispatch(
+        addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(profit)}`)
+      );
+      setClosingTicket(null);
+    }
   };
 
-  const handleModifySave = (ticket, sl, tp) => {
-    dispatch(modifyOrder(ticket, sl, tp));
-    dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+  const handleModifySave = async (ticket, sl, tp) => {
+    setModifyError('');
+
+    if (backendBridge.isConfigured()) {
+      // ── Live backend mode ───────────────────────────────────────────────
+      try {
+        await backendBridge.modifyOrder(ticket, sl, tp);
+        dispatch(modifyOrder(ticket, sl, tp));
+        dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+        return true;
+      } catch (err) {
+        const msg = `Failed to modify #${ticket}: ${err.message}`;
+        setModifyError(msg);
+        dispatch(addLog('error', msg));
+        return false;
+      }
+    } else {
+      // ── Demo / simulator mode ────────────────────────────────────────────
+      dispatch(modifyOrder(ticket, sl, tp));
+      dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+      return true;
+    }
   };
 
   const totalProfit = openOrders.reduce((sum, o) => sum + (o.profit || 0), 0);
@@ -114,10 +165,15 @@ const Positions = () => {
       {modifyTarget && (
         <ModifyModal
           order={modifyTarget}
-          onClose={() => setModifyTarget(null)}
-          onSave={handleModifySave}
+          onClose={() => { setModifyTarget(null); setModifyError(''); }}
+          onSave={async (ticket, sl, tp) => {
+            const ok = await handleModifySave(ticket, sl, tp);
+            if (ok) setModifyTarget(null);
+          }}
         />
       )}
+      {closeError && <div className="pos-error">{closeError}</div>}
+      {modifyError && <div className="pos-error">{modifyError}</div>}
       <div className="pos-tabs">
         {TABS.map((t) => (
           <button
@@ -175,7 +231,8 @@ const Positions = () => {
                       <button
                         className="modify-btn"
                         title="Modify SL/TP"
-                        onClick={() => setModifyTarget(o)}
+                        disabled={closingTicket === o.ticket}
+                        onClick={() => { setModifyError(''); setModifyTarget(o); }}
                       >
                         ✎
                       </button>
@@ -184,9 +241,10 @@ const Positions = () => {
                       <button
                         className="close-btn"
                         title="Close position"
+                        disabled={closingTicket === o.ticket}
                         onClick={() => handleClose(o.ticket, o.symbol, o.type, o.lots, o.openPrice)}
                       >
-                        ✕
+                        {closingTicket === o.ticket ? '…' : '✕'}
                       </button>
                     </td>
                   </tr>

@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
+import backendBridge from '../../services/backendBridge';
 import './OrderPanel.css';
 
 const ORDER_TYPES = ['BUY', 'SELL', 'BUY LIMIT', 'SELL LIMIT', 'BUY STOP', 'SELL STOP'];
@@ -20,6 +21,8 @@ const OrderPanel = () => {
   const [tp, setTp] = useState('');
   const [price, setPrice] = useState('');
   const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const quote = quotes[activeSymbol] || {};
   const isMarket = orderType === 'BUY' || orderType === 'SELL';
@@ -35,7 +38,7 @@ const OrderPanel = () => {
 
   const canTrade = freeMargin >= requiredMargin && openPrice > 0 && lots > 0;
 
-  const submitOrder = (type) => {
+  const submitOrder = async (type) => {
     const isBuyType = type.startsWith('BUY');
     const execPrice = isMarket
       ? (isBuyType ? quote.ask : quote.bid)
@@ -62,16 +65,43 @@ const OrderPanel = () => {
       comment,
     };
 
-    dispatch(placeOrder(order));
-    // Note: account margin is recalculated automatically on each simulator tick
-    dispatch(
-      addLog(
-        'info',
-        `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
-      )
-    );
-    setPrice('');
-    setComment('');
+    setSubmitError('');
+    setSubmitting(true);
+
+    if (backendBridge.isConfigured()) {
+      // ── Live backend mode ───────────────────────────────────────────────
+      try {
+        const placed = await backendBridge.placeOrder(order);
+        // Dispatch with server-assigned ticket so UI reflects backend state
+        dispatch(placeOrder(placed));
+        dispatch(
+          addLog(
+            'info',
+            `Order placed: ${placed.type} ${placed.lots} ${placed.symbol} @ ${formatPrice(placed.symbol, placed.openPrice)} #${placed.ticket}`
+          )
+        );
+        setPrice('');
+        setComment('');
+      } catch (err) {
+        const msg = `Order rejected: ${err.message}`;
+        setSubmitError(msg);
+        dispatch(addLog('error', msg));
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // ── Demo / simulator mode ────────────────────────────────────────────
+      dispatch(placeOrder(order));
+      dispatch(
+        addLog(
+          'info',
+          `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
+        )
+      );
+      setPrice('');
+      setComment('');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -189,22 +219,25 @@ const OrderPanel = () => {
 
         <div className="op-actions">
           <button
-            className={`op-btn buy${!canTrade ? ' disabled' : ''}`}
+            className={`op-btn buy${(!canTrade || submitting) ? ' disabled' : ''}`}
             onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
-            disabled={!canTrade}
+            disabled={!canTrade || submitting}
           >
-            ▲ BUY
+            {submitting ? '…' : '▲ BUY'}
           </button>
           <button
-            className={`op-btn sell${!canTrade ? ' disabled' : ''}`}
+            className={`op-btn sell${(!canTrade || submitting) ? ' disabled' : ''}`}
             onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
-            disabled={!canTrade}
+            disabled={!canTrade || submitting}
           >
-            ▼ SELL
+            {submitting ? '…' : '▼ SELL'}
           </button>
         </div>
         {!canTrade && openPrice > 0 && (
           <div className="op-warn">Insufficient margin</div>
+        )}
+        {submitError && (
+          <div className="op-warn">{submitError}</div>
         )}
       </div>
     </div>
