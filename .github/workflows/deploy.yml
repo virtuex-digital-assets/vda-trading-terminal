@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - copilot/investigate-conversation-issues
+      - copilot/push-all-data-to-repo
   workflow_dispatch:
 
 permissions:

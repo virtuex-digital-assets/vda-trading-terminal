@@ -387,6 +387,38 @@ Here's what you'll see when you open it:
 
 ---
 
+## 🗄️ Database Setup (optional — for production)
+
+The backend runs fully in-memory by default, so **no database is required** to run the demo.
+
+For a production deployment with PostgreSQL:
+
+```bash
+# 1. Create the database
+createdb vda_trading
+
+# 2. Apply the schema (tables, indexes, triggers)
+psql -d vda_trading -f database/schema.sql
+
+# 3. Load demo / seed data (users, accounts, sample orders)
+psql -d vda_trading -f database/seeds.sql
+```
+
+**Demo credentials loaded by the seed file:**
+
+| Role | Email | Password |
+|---|---|---|
+| Super Admin | superadmin@vda.trade | SuperAdmin1234! |
+| Admin/Broker | admin@vda.trade | Admin1234! |
+| Demo Trader | demo@vda.trade | Demo1234! |
+| Trader 2 | trader2@vda.trade | Trader1234! |
+
+> ⚠️ **CRITICAL**: Change **all** passwords immediately before deploying to any environment other than local development (staging, production, or any internet-accessible server).
+
+For incremental schema upgrades use the numbered migration files in `database/migrations/`.
+
+---
+
 ## License
 
 MIT © Virtuex Digital Assets
