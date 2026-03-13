@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
+import backendBridge from './services/backendBridge';
 
 import MarketWatch    from './components/MarketWatch/MarketWatch';
 import Chart          from './components/Chart/Chart';
@@ -27,17 +28,30 @@ const AppInner = () => {
   const [showLogin,  setShowLogin]  = useState(false);
 
   useEffect(() => {
-    if (MT4_BRIDGE_URL) {
-      mt4Bridge.connect(MT4_BRIDGE_URL);
-    } else {
-      mt4Bridge.startSimulator();
+    // Use the backend bridge for real-time data when the API is configured,
+    // otherwise fall back to the built-in MT4 simulator.
+    if (!backendBridge.isConfigured()) {
+      if (MT4_BRIDGE_URL) {
+        mt4Bridge.connect(MT4_BRIDGE_URL);
+      } else {
+        mt4Bridge.startSimulator();
+      }
     }
     return () => mt4Bridge.disconnect();
   }, []);
 
-  const handleLogin = (role) => {
+  const handleLogin = async (role, token) => {
     setUserRole(role);
     setShowLogin(false);
+
+    // When a real backend token is available, initialise the bridge.
+    if (token && backendBridge.isConfigured()) {
+      backendBridge.setToken(token);
+      // Stop the local simulator if it was running
+      mt4Bridge.stopSimulator();
+      await backendBridge.initialize();
+    }
+
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin') setAppMode('broker');
   };
@@ -45,8 +59,14 @@ const AppInner = () => {
   const handleLogout = () => {
     localStorage.removeItem('vda_token');
     localStorage.removeItem('vda_user');
+    backendBridge.disconnect();
     setUserRole(null);
     setAppMode('terminal');
+
+    // Restart local simulator after logout
+    if (!backendBridge.isConfigured()) {
+      mt4Bridge.startSimulator();
+    }
   };
 
   const modeLabel = {
@@ -106,7 +126,7 @@ const AppInner = () => {
         </div>
 
         <div className="top-actions">
-          {appMode === 'terminal' && (
+          {appMode === 'terminal' && !backendBridge.isConfigured() && (
             <button
               className="top-btn"
               title="Restart simulator"
