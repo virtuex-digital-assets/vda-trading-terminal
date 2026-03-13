@@ -184,7 +184,7 @@ const SuperAdmin = () => {
     if (isNaN(amount)) { flash('Enter a valid amount.'); return; }
 
     // Try backend first when configured
-    if (backendBridge.isConfigured() && backendUsers.length > 0) {
+    if (backendBridge.isConfigured()) {
       try {
         // Find the account of the matched user
         const accounts = await backendBridge.getAdminAccounts();
