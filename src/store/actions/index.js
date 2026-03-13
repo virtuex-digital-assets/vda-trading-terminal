@@ -106,6 +106,14 @@ export const cancelPendingOrder = (ticket) => ({
   payload: ticket,
 });
 
+// ── Backend order sync actions ────────────────────────────────────────────
+/** Replace all orders from the backend (used after login or full refresh). */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: { open, pending, history },
+});
+
+/** Add a single closed order to history (e.g. from WS broadcast). */
 /**
  * Bulk-replace the orders state from the backend (used on login / reconnect).
  * @param {{ open: object[], pending: object[], history: object[] }} orders

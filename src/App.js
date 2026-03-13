@@ -3,6 +3,7 @@ import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
 import backendBridge from './services/backendBridge';
+import { updateAccount, setOrders, addLog } from './store/actions';
 
 import MarketWatch    from './components/MarketWatch/MarketWatch';
 import Chart          from './components/Chart/Chart';
@@ -43,6 +44,7 @@ const AppInner = () => {
     return () => mt4Bridge.disconnect();
   }, []);
 
+  const handleLogin = async (role) => {
   // ── Auto-login from stored JWT ────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('vda_token');
@@ -93,6 +95,36 @@ const AppInner = () => {
 
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin') setAppMode('broker');
+
+    // When a backend API is configured, load account + orders and authenticate WS
+    if (backendBridge.isConfigured()) {
+      const token = localStorage.getItem('vda_token');
+      if (token) {
+        backendBridge.setToken(token);
+        // Authenticate the existing WebSocket with the JWT
+        mt4Bridge.setAuthToken(token);
+        // Load initial account state from REST
+        try {
+          const account = await backendBridge.loadAccount();
+          store.dispatch(updateAccount(account));
+        } catch (err) {
+          store.dispatch(addLog('warn', `Could not load account: ${err.message}`));
+        }
+        // Load open/pending orders and history from REST
+        try {
+          const [ordersData, history] = await Promise.all([
+            backendBridge.loadOrders(),
+            backendBridge.loadHistory(),
+          ]);
+          store.dispatch(setOrders(
+            ordersData.open    || [],
+            ordersData.pending || [],
+            history            || [],
+          ));
+        } catch (err) {
+          store.dispatch(addLog('warn', `Could not load orders: ${err.message}`));
+        }
+      }
     // When connected to the live backend, load account state and orders.
     if (backendBridge.isConfigured()) {
       backendBridge.loadAccount();
