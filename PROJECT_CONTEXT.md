@@ -25,9 +25,22 @@
 12. [Source Code — Redux Store](#source-code--redux-store)
 13. [Source Code — Redux Reducers](#source-code--redux-reducers)
 14. [Source Code — UI Components (Trading Terminal)](#source-code--ui-components-trading-terminal)
-15. [Source Code — CRM Components](#source-code--crm-components)
-16. [Tests](#tests)
-17. [CRM System — Standalone Repo Files](#crm-system--standalone-repo-files)
+15. [Source Code — Additional UI Components](#source-code--additional-ui-components)
+16. [Source Code — CRM Components](#source-code--crm-components)
+17. [Tests](#tests)
+18. [Source Code — Additional Tests](#source-code--additional-tests)
+19. [CRM System — Standalone Repo Files](#crm-system--standalone-repo-files)
+20. [Backend Server (Node.js / Express + WebSocket)](#backend-server-nodejs--express--websocket)
+21. [Backend — Middleware](#backend--middleware)
+22. [Backend — Routes](#backend--routes)
+23. [Backend — Controllers](#backend--controllers)
+24. [Backend — Models](#backend--models)
+25. [Backend — Services](#backend--services)
+26. [Backend — Utilities](#backend--utilities)
+27. [Backend — Tests](#backend--tests)
+28. [Database (PostgreSQL)](#database-postgresql)
+29. [Docker & Deployment](#docker--deployment)
+30. [Quick Reference](#quick-reference--key-facts-for-chatgpt)
 
 ---
 
@@ -4665,6 +4678,4148 @@ echo ""
 echo "  📖  Full guide: DEPLOY.md"
 echo "═══════════════════════════════════════════════════════"
 echo ""
+```
+
+---
+
+## Backend Server (Node.js / Express + WebSocket)
+
+The trading terminal includes a full backend server built with Express.js, JWT
+authentication, WebSocket price streaming, and an in-memory trading engine.
+
+**Start the backend:**
+```
+cd backend
+npm install
+npm start
+```
+
+**Run backend tests:**
+```
+cd backend
+npm test
+```
+
+## backend/package.json
+
+```json
+{
+  "name": "vda-trading-terminal-backend",
+  "version": "1.0.0",
+  "description": "VDA Trading Terminal – Node.js backend with Express REST API, WebSocket price feed, JWT authentication, and in-memory trading engine.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "test": "jest --watchAll=false"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ]
+  }
+}
+
+```
+
+## backend/.env.example
+
+```bash
+# VDA Trading Terminal – Backend Environment Variables
+# Copy this file to .env and adjust values before starting the server.
+
+# Server port (REST API)
+PORT=5000
+
+# JWT
+JWT_SECRET=change-this-to-a-long-random-string-in-production
+JWT_EXPIRES_IN=24h
+
+# Demo account defaults
+DEFAULT_BALANCE=10000
+DEFAULT_LEVERAGE=100
+
+# Simulator tick rate (milliseconds)
+TICK_INTERVAL_MS=500
+CANDLE_HISTORY_COUNT=200
+
+# Comma-separated list of origins allowed to call the API
+CORS_ORIGINS=http://localhost:3000
+
+```
+
+## backend/server.js
+
+```js
+/**
+ * VDA Trading Terminal – Backend Server
+ *
+ * Starts an Express REST API + WebSocket server that powers the trading
+ * platform.
+ *
+ * REST API base: http://localhost:5000/api
+ * WebSocket:     ws://localhost:5000  (upgrade from HTTP)
+ *
+ * Default demo credentials:
+ *   Admin:  admin@vda.trade / Admin1234!
+ *   Trader: demo@vda.trade  / Demo1234!
+ *
+ * Set REACT_APP_MT4_BRIDGE_URL=ws://localhost:5000 in the React app to
+ * connect the frontend to this backend instead of the built-in simulator.
+ */
+
+require('dotenv').config();
+const http   = require('http');
+const express = require('express');
+const cors    = require('cors');
+const config  = require('./config/config');
+
+// Routes
+const authRoutes    = require('./routes/auth');
+const orderRoutes   = require('./routes/orders');
+const accountRoutes = require('./routes/account');
+const symbolRoutes  = require('./routes/symbols');
+const adminRoutes   = require('./routes/admin');
+
+// Middleware
+const errorHandler = require('./middleware/errorHandler');
+
+const app = express();
+
+// ── CORS ───────────────────────────────────────────────────────────────────
+app.use(cors({
+  origin: config.corsOrigins,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// ── Body parsing ───────────────────────────────────────────────────────────
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// ── Request logger ─────────────────────────────────────────────────────────
+app.use((req, _res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
+// ── Routes ─────────────────────────────────────────────────────────────────
+app.use('/api/auth',    authRoutes);
+app.use('/api/orders',  orderRoutes);
+app.use('/api/account', accountRoutes);
+app.use('/api/symbols', symbolRoutes);
+app.use('/api/admin',   adminRoutes);
+
+// ── Health check ───────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+
+// ── 404 handler ────────────────────────────────────────────────────────────
+app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
+
+// ── Error handler ──────────────────────────────────────────────────────────
+app.use(errorHandler);
+
+// ── HTTP + WebSocket server ────────────────────────────────────────────────
+const httpServer = http.createServer(app);
+
+const { startWsServer } = require('./services/wsServer');
+startWsServer(httpServer);
+
+httpServer.listen(config.port, () => {
+  console.log(`VDA Trading Terminal – Backend Server`);
+  console.log(`  REST API  → http://localhost:${config.port}/api`);
+  console.log(`  WebSocket → ws://localhost:${config.port}`);
+  console.log(`  Demo:  admin@vda.trade / Admin1234!`);
+  console.log(`  Demo:  demo@vda.trade  / Demo1234!`);
+});
+
+module.exports = app; // exported for testing
+
+```
+
+## backend/config/config.js
+
+```js
+/**
+ * Backend configuration.
+ * All values can be overridden via environment variables.
+ */
+require('dotenv').config();
+
+module.exports = {
+  port: parseInt(process.env.PORT || '5000', 10),
+  wsPort: parseInt(process.env.WS_PORT || '5001', 10),
+
+  // JWT
+  jwtSecret: process.env.JWT_SECRET || 'vda-trading-secret-change-in-production',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+
+  // Demo account defaults
+  defaultBalance: parseFloat(process.env.DEFAULT_BALANCE || '10000'),
+  defaultLeverage: parseInt(process.env.DEFAULT_LEVERAGE || '100', 10),
+
+  // Simulator
+  tickIntervalMs: parseInt(process.env.TICK_INTERVAL_MS || '500', 10),
+  candleHistoryCount: parseInt(process.env.CANDLE_HISTORY_COUNT || '200', 10),
+
+  // CORS – origins allowed to call the REST API
+  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),
+};
+
+```
+
+---
+
+## Backend — Middleware
+
+## backend/middleware/auth.js
+
+```js
+/**
+ * JWT authentication middleware.
+ *
+ * Attaches the decoded user payload to `req.user` when a valid Bearer token
+ * is present, or returns 401 when the token is missing / invalid.
+ */
+const { verifyToken } = require('../utils/jwt');
+const { getUserById } = require('../models');
+
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  }
+
+  const token = authHeader.slice(7);
+  try {
+    const decoded = verifyToken(token);
+    const user = getUserById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    req.user = { id: user.id, email: user.email, role: user.role, name: user.name };
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+/** Only allow users with role === 'admin'. */
+function adminOnly(req, res, next) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+module.exports = { authMiddleware, adminOnly };
+
+```
+
+## backend/middleware/rateLimiter.js
+
+```js
+/**
+ * Rate limiters for sensitive routes.
+ *
+ * – authLimiter:   strict limit on login/register to prevent brute-force attacks
+ * – apiLimiter:    general limit on authenticated API endpoints
+ * – adminLimiter:  tighter limit on admin endpoints
+ */
+const rateLimit = require('express-rate-limit');
+
+/** Strict limiter for authentication endpoints (login / register). */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+/** General limiter for authenticated API calls. */
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+/** Tighter limiter for admin endpoints. */
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+module.exports = { authLimiter, apiLimiter, adminLimiter };
+
+```
+
+## backend/middleware/errorHandler.js
+
+```js
+/**
+ * Centralised error-handling middleware.
+ * Must be registered AFTER all routes (4-argument function).
+ */
+// eslint-disable-next-line no-unused-vars
+function errorHandler(err, req, res, next) {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || 'Internal server error';
+  console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} → ${status}: ${message}`);
+  res.status(status).json({ error: message });
+}
+
+module.exports = errorHandler;
+
+```
+
+---
+
+## Backend — Routes
+
+## backend/routes/auth.js
+
+```js
+const express = require('express');
+const router  = express.Router();
+const { register, login, me } = require('../controllers/authController');
+const { authMiddleware } = require('../middleware/auth');
+const { authLimiter, apiLimiter } = require('../middleware/rateLimiter');
+
+router.post('/register', authLimiter, register);
+router.post('/login',    authLimiter, login);
+router.get('/me',        apiLimiter, authMiddleware, me);
+
+module.exports = router;
+
+```
+
+## backend/routes/orders.js
+
+```js
+const express = require('express');
+const router  = express.Router();
+const { listOrders, placeOrder, closeOrder, modifyOrder, getHistory } = require('../controllers/orderController');
+const { authMiddleware } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
+
+router.use(apiLimiter, authMiddleware);
+
+router.get('/',           listOrders);
+router.post('/',          placeOrder);
+router.get('/history',    getHistory);
+router.delete('/:ticket', closeOrder);
+router.patch('/:ticket',  modifyOrder);
+
+module.exports = router;
+
+```
+
+## backend/routes/account.js
+
+```js
+const express = require('express');
+const router  = express.Router();
+const { getAccount, setLeverage } = require('../controllers/accountController');
+const { authMiddleware } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
+
+router.use(apiLimiter, authMiddleware);
+
+router.get('/',           getAccount);
+router.patch('/leverage', setLeverage);
+
+module.exports = router;
+
+```
+
+## backend/routes/admin.js
+
+```js
+const express = require('express');
+const router  = express.Router();
+const { getRisk, listAccounts, listAllOrders, forceCloseOrder } = require('../controllers/adminController');
+const { authMiddleware, adminOnly } = require('../middleware/auth');
+const { adminLimiter } = require('../middleware/rateLimiter');
+
+router.use(adminLimiter, authMiddleware, adminOnly);
+
+router.get('/risk',                  getRisk);
+router.get('/accounts',              listAccounts);
+router.get('/orders',                listAllOrders);
+router.post('/orders/:ticket/close', forceCloseOrder);
+
+module.exports = router;
+
+```
+
+## backend/routes/symbols.js
+
+```js
+const express = require('express');
+const router  = express.Router();
+const { listSymbols, getCandles } = require('../controllers/symbolController');
+
+// Public endpoints – no authentication required for market data
+router.get('/',                  listSymbols);
+router.get('/:symbol/candles',   getCandles);
+
+module.exports = router;
+
+```
+
+---
+
+## Backend — Controllers
+
+## backend/controllers/authController.js
+
+```js
+const bcrypt     = require('bcryptjs');
+const { signToken } = require('../utils/jwt');
+const db         = require('../models');
+
+/**
+ * POST /api/auth/register
+ * Body: { email, password, name }
+ */
+async function register(req, res, next) {
+  try {
+    const { email, password, name } = req.body;
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'email, password, and name are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (db.getUserByEmail(email)) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+    const user    = db.createUser(email, password, name, 'trader');
+    const account = db.createAccount(user.id);
+    const token   = signToken({ id: user.id, role: user.role });
+    res.status(201).json({
+      token,
+      user:    { id: user.id, email: user.email, name: user.name, role: user.role },
+      account: sanitiseAccount(account),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/auth/login
+ * Body: { email, password }
+ */
+async function login(req, res, next) {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
+    }
+    const user = db.getUserByEmail(email);
+    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token   = signToken({ id: user.id, role: user.role });
+    const account = db.getAccountByUserId(user.id);
+    res.json({
+      token,
+      user:    { id: user.id, email: user.email, name: user.name, role: user.role },
+      account: account ? sanitiseAccount(account) : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * GET /api/auth/me
+ * Returns the authenticated user's profile.
+ */
+function me(req, res) {
+  const account = db.getAccountByUserId(req.user.id);
+  res.json({
+    user:    req.user,
+    account: account ? sanitiseAccount(account) : null,
+  });
+}
+
+function sanitiseAccount(a) {
+  // eslint-disable-next-line no-unused-vars
+  const { userId, ...rest } = a;
+  return rest;
+}
+
+module.exports = { register, login, me };
+
+```
+
+## backend/controllers/orderController.js
+
+```js
+const db             = require('../models');
+const tradingEngine  = require('../services/tradingEngine');
+const { broadcast }  = require('../services/wsServer');
+
+function getAccountId(req) {
+  return db.getAccountByUserId(req.user.id)?.id || null;
+}
+
+/**
+ * GET /api/orders
+ * Returns open + pending orders for the authenticated account.
+ */
+function listOrders(req, res) {
+  const accountId = getAccountId(req);
+  if (!accountId) return res.status(404).json({ error: 'No trading account found' });
+
+  const open    = [...db.openOrders.values()].filter((o) => o.accountId === accountId);
+  const pending = [...db.pendingOrders.values()].filter((o) => o.accountId === accountId);
+  res.json({ open, pending });
+}
+
+/**
+ * POST /api/orders
+ * Body: { symbol, type, lots, price?, sl?, tp?, comment? }
+ */
+function placeOrder(req, res) {
+  const accountId = getAccountId(req);
+  if (!accountId) return res.status(404).json({ error: 'No trading account found' });
+
+  const { symbol, type, lots, price, sl, tp, comment } = req.body;
+  const result = tradingEngine.placeOrder({ accountId, symbol, type, lots, price, sl, tp, comment });
+
+  if (!result.ok) return res.status(400).json({ error: result.error });
+
+  broadcast({ type: 'order', action: 'open', order: result.order },
+    (client) => client._accountId === accountId);
+  res.status(201).json(result.order);
+}
+
+/**
+ * DELETE /api/orders/:ticket
+ * Close an open market order, or cancel a pending order.
+ */
+function closeOrder(req, res) {
+  const ticket    = parseInt(req.params.ticket, 10);
+  const accountId = getAccountId(req);
+  if (!accountId) return res.status(404).json({ error: 'No trading account found' });
+
+  // Verify ownership
+  const openOrder    = db.openOrders.get(ticket);
+  const pendingOrder = db.pendingOrders.get(ticket);
+  const order        = openOrder || pendingOrder;
+  if (!order) return res.status(404).json({ error: `Order #${ticket} not found` });
+  if (order.accountId !== accountId) return res.status(403).json({ error: 'Not your order' });
+
+  const result = openOrder
+    ? tradingEngine.closeOrder(ticket)
+    : tradingEngine.cancelOrder(ticket);
+
+  if (!result.ok) return res.status(400).json({ error: result.error });
+
+  broadcast({ type: 'order', action: 'close', order: result.closedOrder || result.order },
+    (client) => client._accountId === accountId);
+  res.json(result.closedOrder || result.order);
+}
+
+/**
+ * PATCH /api/orders/:ticket
+ * Modify SL/TP of an existing order.
+ * Body: { sl?, tp? }
+ */
+function modifyOrder(req, res) {
+  const ticket    = parseInt(req.params.ticket, 10);
+  const accountId = getAccountId(req);
+  if (!accountId) return res.status(404).json({ error: 'No trading account found' });
+
+  const order = db.openOrders.get(ticket) || db.pendingOrders.get(ticket);
+  if (!order) return res.status(404).json({ error: `Order #${ticket} not found` });
+  if (order.accountId !== accountId) return res.status(403).json({ error: 'Not your order' });
+
+  const result = tradingEngine.modifyOrder(ticket, req.body);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+
+  broadcast({ type: 'order', action: 'modify', order: result.order },
+    (client) => client._accountId === accountId);
+  res.json(result.order);
+}
+
+/**
+ * GET /api/orders/history
+ * Returns closed order history for the authenticated account.
+ */
+function getHistory(req, res) {
+  const accountId = getAccountId(req);
+  if (!accountId) return res.status(404).json({ error: 'No trading account found' });
+
+  const history = [...db.closedOrders.values()]
+    .filter((o) => o.accountId === accountId)
+    .sort((a, b) => new Date(b.closeTime) - new Date(a.closeTime));
+  res.json(history);
+}
+
+module.exports = { listOrders, placeOrder, closeOrder, modifyOrder, getHistory };
+
+```
+
+## backend/controllers/accountController.js
+
+```js
+const db = require('../models');
+
+/**
+ * GET /api/account
+ * Returns the authenticated user's trading account.
+ */
+function getAccount(req, res) {
+  const account = db.getAccountByUserId(req.user.id);
+  if (!account) return res.status(404).json({ error: 'No trading account found' });
+  // eslint-disable-next-line no-unused-vars
+  const { userId, ...safe } = account;
+  res.json(safe);
+}
+
+/**
+ * PATCH /api/account/leverage
+ * Body: { leverage: number }
+ * Only allowed when no open orders exist.
+ */
+function setLeverage(req, res) {
+  const account = db.getAccountByUserId(req.user.id);
+  if (!account) return res.status(404).json({ error: 'No trading account found' });
+
+  const leverage = parseInt(req.body.leverage, 10);
+  if (!leverage || leverage < 1 || leverage > 1000) {
+    return res.status(400).json({ error: 'Leverage must be between 1 and 1000' });
+  }
+
+  const openCount = [...db.openOrders.values()].filter((o) => o.accountId === account.id).length;
+  if (openCount > 0) {
+    return res.status(400).json({ error: 'Cannot change leverage while orders are open' });
+  }
+
+  account.leverage = leverage;
+  res.json({ leverage });
+}
+
+module.exports = { getAccount, setLeverage };
+
+```
+
+## backend/controllers/adminController.js
+
+```js
+const db            = require('../models');
+const tradingEngine = require('../services/tradingEngine');
+
+/**
+ * GET /api/admin/risk
+ * Returns broker-level risk metrics: symbol exposure + account summaries.
+ * Requires admin role.
+ */
+function getRisk(req, res) {
+  const risk = tradingEngine.getBrokerRisk();
+  res.json(risk);
+}
+
+/**
+ * GET /api/admin/accounts
+ * Returns all trading accounts with their current status.
+ */
+function listAccounts(req, res) {
+  const accounts = [...db.accounts.values()].map((a) => {
+    // eslint-disable-next-line no-unused-vars
+    const { userId, ...safe } = a;
+    return safe;
+  });
+  res.json(accounts);
+}
+
+/**
+ * GET /api/admin/orders
+ * Returns all open orders across all accounts.
+ */
+function listAllOrders(req, res) {
+  const open    = [...db.openOrders.values()];
+  const pending = [...db.pendingOrders.values()];
+  res.json({ open, pending });
+}
+
+/**
+ * POST /api/admin/close/:ticket
+ * Force-close any open order (admin override).
+ */
+function forceCloseOrder(req, res) {
+  const ticket = parseInt(req.params.ticket, 10);
+  const result = tradingEngine.closeOrder(ticket);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json(result.closedOrder);
+}
+
+module.exports = { getRisk, listAccounts, listAllOrders, forceCloseOrder };
+
+```
+
+## backend/controllers/symbolController.js
+
+```js
+const db = require('../models');
+
+/**
+ * GET /api/symbols
+ * Returns the list of available symbols with latest quotes.
+ */
+function listSymbols(req, res) {
+  const symbols = [];
+  db.quotes.forEach((quote, symbol) => {
+    symbols.push({ symbol, ...quote });
+  });
+  res.json(symbols);
+}
+
+/**
+ * GET /api/symbols/:symbol/candles?timeframe=H1&count=200
+ * Returns OHLCV candle history for a symbol.
+ */
+function getCandles(req, res) {
+  const { symbol } = req.params;
+  const timeframe  = req.query.timeframe || 'H1';
+  const count      = Math.min(parseInt(req.query.count || '200', 10), 500);
+
+  const key     = `${symbol}_${timeframe}`;
+  const candles = db.candles.get(key);
+  if (!candles) {
+    return res.status(404).json({ error: `No candles found for ${symbol} ${timeframe}` });
+  }
+  res.json(candles.slice(-count));
+}
+
+module.exports = { listSymbols, getCandles };
+
+```
+
+---
+
+## Backend — Models
+
+## backend/models/index.js
+
+```js
+/**
+ * In-memory data store.
+ *
+ * Provides a simple, session-scoped store for all platform data.
+ * In a production deployment this would be replaced by a database
+ * (PostgreSQL / MongoDB – see /database/schema.sql for the schema).
+ */
+
+const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
+const config = require('../config/config');
+
+// ── Users ──────────────────────────────────────────────────────────────────
+
+const users = new Map();
+
+// ── Accounts ───────────────────────────────────────────────────────────────
+
+const accounts = new Map();
+
+// ── Orders ─────────────────────────────────────────────────────────────────
+
+const openOrders = new Map();    // ticket → order
+const pendingOrders = new Map(); // ticket → order
+const closedOrders = new Map();  // ticket → order
+
+let ticketCounter = 1000;
+function nextTicket() {
+  return ++ticketCounter;
+}
+
+// ── Price feed cache ───────────────────────────────────────────────────────
+
+// symbol → { bid, ask, time, change, changePercent }
+const quotes = new Map();
+
+// symbol_timeframe → candle[]
+const candles = new Map();
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function getUserByEmail(email) {
+  for (const u of users.values()) {
+    if (u.email === email) return u;
+  }
+  return null;
+}
+
+function getUserById(id) {
+  return users.get(id) || null;
+}
+
+function getAccountByUserId(userId) {
+  for (const a of accounts.values()) {
+    if (a.userId === userId) return a;
+  }
+  return null;
+}
+
+function getAccountById(id) {
+  return accounts.get(id) || null;
+}
+
+function createAccount(userId, overrides = {}) {
+  const id = uuidv4();
+  const loginNum = String(10000 + accounts.size + 1);
+  const account = {
+    id,
+    userId,
+    login: loginNum,
+    server: 'VDA-Demo',
+    balance: config.defaultBalance,
+    equity: config.defaultBalance,
+    margin: 0,
+    freeMargin: config.defaultBalance,
+    marginLevel: 0,
+    profit: 0,
+    leverage: config.defaultLeverage,
+    currency: 'USD',
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+  accounts.set(id, account);
+  return account;
+}
+
+function createUser(email, password, name, role = 'trader') {
+  const id = uuidv4();
+  const user = {
+    id,
+    email,
+    passwordHash: bcrypt.hashSync(password, 10),
+    role,
+    name,
+    createdAt: new Date().toISOString(),
+  };
+  users.set(id, user);
+  return user;
+}
+
+// ── Seed default accounts ──────────────────────────────────────────────────
+// Runs after all helpers are defined.
+(function seedUsers() {
+  const adminUser  = createUser('admin@vda.trade', 'Admin1234!', 'VDA Admin',    'admin');
+  const traderUser = createUser('demo@vda.trade',  'Demo1234!',  'Demo Trader',  'trader');
+  createAccount(traderUser.id);
+  // Suppress unused-variable warning – adminUser is seeded for login only
+  void adminUser;
+})();
+
+module.exports = {
+  users,
+  accounts,
+  openOrders,
+  pendingOrders,
+  closedOrders,
+  quotes,
+  candles,
+  nextTicket,
+  getUserByEmail,
+  getUserById,
+  getAccountByUserId,
+  getAccountById,
+  createAccount,
+  createUser,
+};
+
+```
+
+---
+
+## Backend — Services
+
+## backend/services/tradingEngine.js
+
+```js
+/**
+ * Core trading engine.
+ *
+ * Handles order placement, modification, closure, margin calculation,
+ * P&L updates, and stop-loss / take-profit trigger logic.
+ *
+ * All methods are synchronous and operate on the in-memory store.
+ */
+
+const db = require('../models');
+const { calculateMargin, calculatePnL } = require('../utils/margin');
+
+/**
+ * Place a new order.
+ *
+ * @param {object} params
+ * @param {string} params.accountId
+ * @param {string} params.symbol
+ * @param {string} params.type       BUY | SELL | BUY LIMIT | SELL LIMIT | BUY STOP | SELL STOP
+ * @param {number} params.lots
+ * @param {number} [params.price]    Required for pending orders
+ * @param {number} [params.sl]       Stop-loss price
+ * @param {number} [params.tp]       Take-profit price
+ * @param {string} [params.comment]
+ * @returns {{ ok: boolean, order?: object, error?: string }}
+ */
+function placeOrder({ accountId, symbol, type, lots, price, sl, tp, comment }) {
+  const account = db.getAccountById(accountId);
+  if (!account) return { ok: false, error: 'Account not found' };
+
+  const quote = db.quotes.get(symbol);
+  if (!quote) return { ok: false, error: `No quote available for ${symbol}` };
+
+  const isMarket = type === 'BUY' || type === 'SELL';
+  const isBuy    = type.startsWith('BUY');
+
+  const execPrice = isMarket
+    ? (isBuy ? quote.ask : quote.bid)
+    : (price || 0);
+
+  if (!execPrice || execPrice <= 0) {
+    return { ok: false, error: 'Invalid execution price' };
+  }
+  if (!lots || lots <= 0) {
+    return { ok: false, error: 'Invalid lot size' };
+  }
+
+  const margin = calculateMargin(symbol, lots, execPrice, account.leverage);
+
+  if (isMarket && account.freeMargin < margin) {
+    return { ok: false, error: `Insufficient free margin (required: $${margin}, available: $${account.freeMargin})` };
+  }
+
+  const ticket = db.nextTicket();
+  const order = {
+    ticket,
+    accountId,
+    symbol,
+    type,
+    lots: parseFloat(lots),
+    openPrice: parseFloat(execPrice.toFixed(5)),
+    sl:   sl  ? parseFloat(sl)  : null,
+    tp:   tp  ? parseFloat(tp)  : null,
+    comment: comment || '',
+    openTime: new Date().toISOString(),
+    profit: 0,
+    swap: 0,
+    commission: 0,
+  };
+
+  if (isMarket) {
+    db.openOrders.set(ticket, order);
+    // Deduct margin from account
+    const newMargin      = parseFloat((account.margin + margin).toFixed(2));
+    const newFreeMargin  = parseFloat((account.equity - newMargin).toFixed(2));
+    const marginLevel    = newMargin > 0 ? parseFloat(((account.equity / newMargin) * 100).toFixed(2)) : 0;
+    Object.assign(account, { margin: newMargin, freeMargin: newFreeMargin, marginLevel });
+  } else {
+    db.pendingOrders.set(ticket, order);
+  }
+
+  return { ok: true, order };
+}
+
+/**
+ * Close an open market order at current market price.
+ *
+ * @param {number} ticket
+ * @returns {{ ok: boolean, closedOrder?: object, error?: string }}
+ */
+function closeOrder(ticket) {
+  const order = db.openOrders.get(ticket);
+  if (!order) return { ok: false, error: `Open order #${ticket} not found` };
+
+  const account = db.getAccountById(order.accountId);
+  if (!account) return { ok: false, error: 'Account not found' };
+
+  const quote = db.quotes.get(order.symbol);
+  const closePrice = quote
+    ? (order.type === 'BUY' ? quote.bid : quote.ask)
+    : order.openPrice;
+
+  const profit = calculatePnL(order.type, order.symbol, order.lots, order.openPrice, closePrice);
+  const margin = calculateMargin(order.symbol, order.lots, order.openPrice, account.leverage);
+
+  const closedOrder = {
+    ...order,
+    closePrice: parseFloat(closePrice.toFixed(5)),
+    closeTime:  new Date().toISOString(),
+    profit:     parseFloat(profit.toFixed(2)),
+  };
+
+  db.openOrders.delete(ticket);
+  db.closedOrders.set(ticket, closedOrder);
+
+  // Update account
+  const newBalance    = parseFloat((account.balance + profit).toFixed(2));
+  const newMargin     = Math.max(0, parseFloat((account.margin - margin).toFixed(2)));
+  const newEquity     = parseFloat((newBalance + totalFloatingProfit(account.id)).toFixed(2));
+  const newFreeMargin = parseFloat((newEquity - newMargin).toFixed(2));
+  const marginLevel   = newMargin > 0 ? parseFloat(((newEquity / newMargin) * 100).toFixed(2)) : 0;
+
+  Object.assign(account, {
+    balance:     newBalance,
+    equity:      newEquity,
+    margin:      newMargin,
+    freeMargin:  newFreeMargin,
+    marginLevel,
+    profit:      parseFloat(totalFloatingProfit(account.id).toFixed(2)),
+  });
+
+  return { ok: true, closedOrder };
+}
+
+/**
+ * Cancel a pending order.
+ */
+function cancelOrder(ticket) {
+  const order = db.pendingOrders.get(ticket);
+  if (!order) return { ok: false, error: `Pending order #${ticket} not found` };
+  db.pendingOrders.delete(ticket);
+  const closed = { ...order, closeTime: new Date().toISOString(), status: 'cancelled', profit: 0 };
+  db.closedOrders.set(ticket, closed);
+  return { ok: true, order: closed };
+}
+
+/**
+ * Modify stop-loss and/or take-profit of an existing order.
+ */
+function modifyOrder(ticket, { sl, tp }) {
+  const order = db.openOrders.get(ticket) || db.pendingOrders.get(ticket);
+  if (!order) return { ok: false, error: `Order #${ticket} not found` };
+  if (sl !== undefined) order.sl = sl ? parseFloat(sl) : null;
+  if (tp !== undefined) order.tp = tp ? parseFloat(tp) : null;
+  return { ok: true, order };
+}
+
+/**
+ * Recalculate floating P&L for all open orders of an account and update
+ * equity / free margin.  Called on every price tick.
+ *
+ * @param {string} accountId
+ */
+function recalculateAccount(accountId) {
+  const account = db.getAccountById(accountId);
+  if (!account) return;
+
+  let totalProfit = 0;
+  const ordersToClose = [];
+
+  db.openOrders.forEach((order) => {
+    if (order.accountId !== accountId) return;
+    const quote = db.quotes.get(order.symbol);
+    if (!quote) return;
+
+    const closePrice = order.type === 'BUY' ? quote.bid : quote.ask;
+    const profit     = calculatePnL(order.type, order.symbol, order.lots, order.openPrice, closePrice);
+    order.profit     = parseFloat(profit.toFixed(2));
+    totalProfit      += order.profit;
+
+    // Check SL/TP
+    if (order.sl && ((order.type === 'BUY' && closePrice <= order.sl) ||
+                     (order.type === 'SELL' && closePrice >= order.sl))) {
+      ordersToClose.push({ ticket: order.ticket, reason: 'sl' });
+    } else if (order.tp && ((order.type === 'BUY' && closePrice >= order.tp) ||
+                             (order.type === 'SELL' && closePrice <= order.tp))) {
+      ordersToClose.push({ ticket: order.ticket, reason: 'tp' });
+    }
+  });
+
+  // Trigger pending orders
+  db.pendingOrders.forEach((order) => {
+    if (order.accountId !== accountId) return;
+    const quote = db.quotes.get(order.symbol);
+    if (!quote) return;
+    let triggered = false;
+    if (order.type === 'BUY LIMIT'  && quote.ask <= order.openPrice) triggered = true;
+    if (order.type === 'SELL LIMIT' && quote.bid >= order.openPrice) triggered = true;
+    if (order.type === 'BUY STOP'   && quote.ask >= order.openPrice) triggered = true;
+    if (order.type === 'SELL STOP'  && quote.bid <= order.openPrice) triggered = true;
+    if (triggered) {
+      const newType = order.type.startsWith('BUY') ? 'BUY' : 'SELL';
+      db.pendingOrders.delete(order.ticket);
+      db.openOrders.set(order.ticket, { ...order, type: newType, openTime: new Date().toISOString() });
+    }
+  });
+
+  // Auto-close SL/TP orders
+  ordersToClose.forEach(({ ticket }) => closeOrder(ticket));
+
+  // Update account equity
+  const equity      = parseFloat((account.balance + totalProfit).toFixed(2));
+  const freeMargin  = parseFloat((equity - account.margin).toFixed(2));
+  const marginLevel = account.margin > 0 ? parseFloat(((equity / account.margin) * 100).toFixed(2)) : 0;
+
+  Object.assign(account, { equity, profit: parseFloat(totalProfit.toFixed(2)), freeMargin, marginLevel });
+
+  // Margin call: close all orders if margin level < 50%
+  if (account.margin > 0 && marginLevel < 50) {
+    db.openOrders.forEach((order) => {
+      if (order.accountId === accountId) closeOrder(order.ticket);
+    });
+  }
+}
+
+/** Sum floating profit for all open orders belonging to an account. */
+function totalFloatingProfit(accountId) {
+  let total = 0;
+  db.openOrders.forEach((o) => {
+    if (o.accountId === accountId) total += o.profit || 0;
+  });
+  return total;
+}
+
+/**
+ * Broker-level risk summary across ALL accounts.
+ */
+function getBrokerRisk() {
+  const symbolExposure = {};   // symbol → { buyLots, sellLots, netLots, unrealisedPnL }
+  const accountSummary = [];   // per-account snapshot
+
+  db.openOrders.forEach((order) => {
+    if (!symbolExposure[order.symbol]) {
+      symbolExposure[order.symbol] = { buyLots: 0, sellLots: 0, netLots: 0, unrealisedPnL: 0 };
+    }
+    const exp = symbolExposure[order.symbol];
+    if (order.type === 'BUY') {
+      exp.buyLots  = parseFloat((exp.buyLots  + order.lots).toFixed(2));
+    } else {
+      exp.sellLots = parseFloat((exp.sellLots + order.lots).toFixed(2));
+    }
+    exp.netLots      = parseFloat((exp.buyLots - exp.sellLots).toFixed(2));
+    exp.unrealisedPnL = parseFloat((exp.unrealisedPnL + (order.profit || 0)).toFixed(2));
+  });
+
+  db.accounts.forEach((account) => {
+    accountSummary.push({
+      accountId:  account.id,
+      login:      account.login,
+      balance:    account.balance,
+      equity:     account.equity,
+      margin:     account.margin,
+      marginLevel: account.marginLevel,
+      profit:     account.profit,
+      openOrders: [...db.openOrders.values()].filter((o) => o.accountId === account.id).length,
+    });
+  });
+
+  return { symbolExposure, accountSummary };
+}
+
+module.exports = {
+  placeOrder,
+  closeOrder,
+  cancelOrder,
+  modifyOrder,
+  recalculateAccount,
+  getBrokerRisk,
+};
+
+```
+
+## backend/services/wsServer.js
+
+```js
+/**
+ * WebSocket broadcast server.
+ *
+ * Clients connect and receive a stream of real-time events:
+ *   { type: 'quote',    symbol, bid, ask, time }
+ *   { type: 'candle',   symbol, timeframe, candle }
+ *   { type: 'account',  accountId, ...accountFields }
+ *   { type: 'order',    action: 'open'|'close'|'modify', order }
+ *   { type: 'risk',     ...brokerRisk }
+ *
+ * Clients may optionally authenticate by sending:
+ *   { type: 'auth', token: '<jwt>' }
+ *
+ * After authentication, position and account updates are scoped to the
+ * authenticated account.
+ */
+
+const WebSocket = require('ws');
+const config    = require('../config/config');
+const { verifyToken } = require('../utils/jwt');
+const { getUserById, getAccountByUserId } = require('../models');
+const { recalculateAccount, getBrokerRisk } = require('./tradingEngine');
+const {
+  DEFAULT_SYMBOLS,
+  generateSimulatedCandles,
+  simulateNextCandle,
+  getSpread,
+  getDecimals,
+} = require('./marketSimulator');
+const db = require('../models');
+
+let wss = null;
+
+/**
+ * Broadcast a JSON message to all connected clients (or a subset).
+ * @param {object} payload
+ * @param {(ws: WebSocket) => boolean} [filter]
+ */
+function broadcast(payload, filter) {
+  if (!wss) return;
+  const msg = JSON.stringify(payload);
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      if (!filter || filter(client)) {
+        client.send(msg);
+      }
+    }
+  });
+}
+
+/** Send a message to a single client. */
+function send(ws, payload) {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
+
+/** Seed candle history for all symbols on startup. */
+function seedCandles() {
+  const timeframes = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1'];
+  DEFAULT_SYMBOLS.forEach((sym) => {
+    timeframes.forEach((tf) => {
+      const key = `${sym}_${tf}`;
+      if (!db.candles.has(key)) {
+        const candles = generateSimulatedCandles(sym, tf, config.candleHistoryCount);
+        db.candles.set(key, candles);
+      }
+    });
+    // Seed initial quotes from H1 candles
+    const h1 = db.candles.get(`${sym}_H1`) || [];
+    if (h1.length > 0) {
+      const last   = h1[h1.length - 1];
+      const dec    = getDecimals(sym);
+      const bid    = parseFloat(last.close.toFixed(dec));
+      const ask    = parseFloat((bid + getSpread(sym)).toFixed(dec));
+      db.quotes.set(sym, { bid, ask, time: new Date().toISOString(), change: 0, changePercent: 0 });
+    }
+  });
+}
+
+/** Run every tick (500 ms): update prices, recalculate accounts, broadcast. */
+function tick() {
+  const timeframe = 'M1'; // default tick timeframe
+
+  DEFAULT_SYMBOLS.forEach((sym) => {
+    const key      = `${sym}_${timeframe}`;
+    const candles  = db.candles.get(key) || [];
+    if (candles.length === 0) return;
+
+    const { newCandle, quote } = simulateNextCandle(sym, timeframe, candles);
+
+    // Update candle store
+    const updated =
+      candles[candles.length - 1] && candles[candles.length - 1].time === newCandle.time
+        ? [...candles.slice(0, -1), newCandle]
+        : [...candles, newCandle];
+    db.candles.set(key, updated.slice(-config.candleHistoryCount));
+
+    // Update quote store
+    const prev           = db.quotes.get(sym) || {};
+    const change         = quote.bid - (prev.bid || quote.bid);
+    const changePercent  = prev.bid ? (change / prev.bid) * 100 : 0;
+    db.quotes.set(sym, { ...quote, change, changePercent });
+
+    // Broadcast quote
+    broadcast({ type: 'quote', symbol: sym, ...quote, change, changePercent });
+    broadcast({ type: 'candle', symbol: sym, timeframe, candle: newCandle });
+  });
+
+  // Recalculate every account
+  db.accounts.forEach((account) => {
+    recalculateAccount(account.id);
+    broadcast(
+      { type: 'account', ...account },
+      (client) => client._accountId === account.id
+    );
+  });
+
+  // Broadcast broker risk to admin clients every 5 ticks
+  tick._count = ((tick._count || 0) + 1);
+  if (tick._count % 10 === 0) {
+    const risk = getBrokerRisk();
+    broadcast({ type: 'risk', ...risk }, (client) => client._role === 'admin');
+  }
+}
+
+/**
+ * Start the WebSocket server.
+ * @param {import('http').Server} httpServer  Attach to existing HTTP server (same port).
+ */
+function startWsServer(httpServer) {
+  wss = new WebSocket.Server({ server: httpServer });
+
+  seedCandles();
+
+  wss.on('connection', (ws) => {
+    ws._role      = 'guest';
+    ws._accountId = null;
+
+    send(ws, { type: 'welcome', message: 'VDA Trading Terminal WebSocket v1.0' });
+
+    ws.on('message', (raw) => {
+      let msg;
+      try {
+        msg = JSON.parse(raw.toString());
+      } catch {
+        send(ws, { type: 'error', message: 'Invalid JSON' });
+        return;
+      }
+
+      if (msg.type === 'auth' && msg.token) {
+        try {
+          const decoded = verifyToken(msg.token);
+          const user    = getUserById(decoded.id);
+          if (!user) {
+            send(ws, { type: 'auth_error', message: 'User not found' });
+            return;
+          }
+          ws._role = user.role;
+          const account = getAccountByUserId(user.id);
+          if (account) {
+            ws._accountId = account.id;
+            // Send current state to the newly authenticated client
+            send(ws, { type: 'account', ...account });
+          }
+          send(ws, { type: 'auth_ok', role: user.role, name: user.name });
+
+          // Send current quotes
+          db.quotes.forEach((q, sym) => {
+            send(ws, { type: 'quote', symbol: sym, ...q });
+          });
+        } catch {
+          send(ws, { type: 'auth_error', message: 'Invalid or expired token' });
+        }
+      }
+
+      // Subscribe to candle history for a symbol/timeframe
+      if (msg.type === 'subscribe_candles' && msg.symbol && msg.timeframe) {
+        const key     = `${msg.symbol}_${msg.timeframe}`;
+        const history = db.candles.get(key) || [];
+        send(ws, { type: 'candles', symbol: msg.symbol, timeframe: msg.timeframe, data: history });
+      }
+    });
+
+    ws.on('error', (err) => {
+      console.error('[WS] client error:', err.message);
+    });
+  });
+
+  // Start price simulation tick
+  setInterval(tick, config.tickIntervalMs);
+
+  console.log('[WS] WebSocket server attached to HTTP server');
+}
+
+module.exports = { startWsServer, broadcast };
+
+```
+
+## backend/services/marketSimulator.js
+
+```js
+/**
+ * Server-side market data simulator.
+ *
+ * Generates realistic-looking OHLCV candle data and bid/ask quotes using a
+ * Gaussian random-walk model.  Used when no live MT4 bridge is connected.
+ */
+
+const SEED_PRICES = {
+  EURUSD:  1.0850,
+  GBPUSD:  1.2650,
+  USDJPY:  149.50,
+  XAUUSD:  2020.0,
+  USDCHF:  0.8950,
+  AUDUSD:  0.6520,
+  USDCAD:  1.3580,
+  NZDUSD:  0.6090,
+  BTCUSD:  52000.0,
+  ETHUSD:  2800.0,
+};
+
+const VOLATILITY = {
+  EURUSD:  0.0008,
+  GBPUSD:  0.001,
+  USDJPY:  0.1,
+  XAUUSD:  1.5,
+  USDCHF:  0.0008,
+  AUDUSD:  0.0009,
+  USDCAD:  0.0009,
+  NZDUSD:  0.0009,
+  BTCUSD:  200,
+  ETHUSD:  30,
+};
+
+const SPREADS = {
+  EURUSD:  0.0001,
+  GBPUSD:  0.0002,
+  USDJPY:  0.02,
+  XAUUSD:  0.3,
+  USDCHF:  0.0002,
+  AUDUSD:  0.0002,
+  USDCAD:  0.0002,
+  NZDUSD:  0.0003,
+  BTCUSD:  5.0,
+  ETHUSD:  0.5,
+};
+
+const TIMEFRAME_SECONDS = {
+  M1:  60,
+  M5:  300,
+  M15: 900,
+  M30: 1800,
+  H1:  3600,
+  H4:  14400,
+  D1:  86400,
+  W1:  604800,
+};
+
+const DEFAULT_SYMBOLS = Object.keys(SEED_PRICES);
+
+/** Gaussian random (Box-Muller transform). */
+function randn() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+function barTime(ts, tfSeconds) {
+  return Math.floor(ts / tfSeconds) * tfSeconds;
+}
+
+function getSpread(symbol) {
+  return SPREADS[symbol] || 0.0001;
+}
+
+function getDecimals(symbol) {
+  if (symbol.includes('JPY')) return 3;
+  if (symbol === 'XAUUSD') return 2;
+  if (symbol === 'BTCUSD') return 2;
+  if (symbol === 'ETHUSD') return 2;
+  return 5;
+}
+
+/**
+ * Generate `count` historical candles for a symbol/timeframe combination
+ * ending at "now".
+ */
+function generateSimulatedCandles(symbol, timeframe, count = 200) {
+  const tfSec = TIMEFRAME_SECONDS[timeframe] || 3600;
+  const vol   = VOLATILITY[symbol] || 0.001;
+  let price   = SEED_PRICES[symbol] || 1.0;
+
+  const nowSec   = Math.floor(Date.now() / 1000);
+  const startTime = barTime(nowSec, tfSec) - (count - 1) * tfSec;
+
+  const result = [];
+  for (let i = 0; i < count; i++) {
+    const time  = startTime + i * tfSec;
+    price       = Math.max(0.0001, price + randn() * vol);
+    const open  = price;
+    const close = Math.max(0.0001, price + randn() * vol * 0.5);
+    const high  = Math.max(open, close) + Math.abs(randn() * vol * 0.3);
+    const low   = Math.min(open, close) - Math.abs(randn() * vol * 0.3);
+    const volume = Math.floor(100 + Math.random() * 900);
+    result.push({ time, open, high, low, close, volume });
+    price = close;
+  }
+  return result;
+}
+
+/**
+ * Advance the simulator by one tick.
+ * Returns `{ newCandle, quote }`.
+ */
+function simulateNextCandle(symbol, timeframe, existingCandles) {
+  const tfSec   = TIMEFRAME_SECONDS[timeframe] || 3600;
+  const vol     = VOLATILITY[symbol] || 0.001;
+  const spread  = getSpread(symbol);
+  const dec     = getDecimals(symbol);
+
+  const nowSec         = Math.floor(Date.now() / 1000);
+  const currentBarTime = barTime(nowSec, tfSec);
+
+  const lastCandle = existingCandles[existingCandles.length - 1];
+  const prevClose  = lastCandle ? lastCandle.close : (SEED_PRICES[symbol] || 1.0);
+
+  const tick = Math.max(0.0001, prevClose + randn() * vol * 0.15);
+
+  let newCandle;
+  if (lastCandle && lastCandle.time === currentBarTime) {
+    newCandle = {
+      ...lastCandle,
+      high:   Math.max(lastCandle.high, tick),
+      low:    Math.min(lastCandle.low, tick),
+      close:  tick,
+      volume: lastCandle.volume + Math.floor(Math.random() * 10),
+    };
+  } else {
+    newCandle = {
+      time:   currentBarTime,
+      open:   prevClose,
+      high:   Math.max(prevClose, tick),
+      low:    Math.min(prevClose, tick),
+      close:  tick,
+      volume: Math.floor(10 + Math.random() * 50),
+    };
+  }
+
+  const bid = parseFloat(newCandle.close.toFixed(dec));
+  const ask = parseFloat((bid + spread).toFixed(dec));
+
+  return {
+    newCandle,
+    quote: { bid, ask, time: new Date().toISOString() },
+  };
+}
+
+module.exports = {
+  DEFAULT_SYMBOLS,
+  SEED_PRICES,
+  VOLATILITY,
+  SPREADS,
+  TIMEFRAME_SECONDS,
+  generateSimulatedCandles,
+  simulateNextCandle,
+  getSpread,
+  getDecimals,
+};
+
+```
+
+---
+
+## Backend — Utilities
+
+## backend/utils/jwt.js
+
+```js
+/**
+ * JWT utilities – sign and verify tokens.
+ */
+const jwt = require('jsonwebtoken');
+const config = require('../config/config');
+
+function signToken(payload) {
+  return jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+}
+
+function verifyToken(token) {
+  return jwt.verify(token, config.jwtSecret);
+}
+
+module.exports = { signToken, verifyToken };
+
+```
+
+## backend/utils/margin.js
+
+```js
+/**
+ * Margin and P&L utilities.
+ */
+
+// Symbols whose base currency is USD – no price conversion needed for margin.
+const USD_BASE_SYMBOLS = new Set(['USDJPY', 'USDCHF', 'USDCAD']);
+
+// Precious metals – contract size is in ounces/units, not 100k.
+const METAL_CONTRACT = { XAUUSD: 100 }; // 1 lot = 100 oz gold
+
+/**
+ * Calculate the required margin for a position (result in USD).
+ *
+ * Rules:
+ *  • USD/xxx pairs (USDJPY, USDCHF, USDCAD): contract is 100,000 USD units →
+ *      margin = lots × 100,000 / leverage
+ *  • xxx/USD pairs (EURUSD, GBPUSD, …): margin = lots × 100,000 × price / leverage
+ *  • XAUUSD: 1 lot = 100 oz → margin = lots × 100 × price / leverage
+ *  • BTCUSD / ETHUSD: 1 lot = 1 coin → margin = lots × price / leverage
+ *
+ * @param {string} symbol
+ * @param {number} lots
+ * @param {number} openPrice
+ * @param {number} leverage
+ * @returns {number} required margin in USD
+ */
+function calculateMargin(symbol, lots, openPrice, leverage) {
+  let notionalUSD;
+
+  if (symbol === 'BTCUSD' || symbol === 'ETHUSD') {
+    notionalUSD = lots * openPrice;
+  } else if (METAL_CONTRACT[symbol]) {
+    notionalUSD = lots * METAL_CONTRACT[symbol] * openPrice;
+  } else if (USD_BASE_SYMBOLS.has(symbol)) {
+    // Base currency = USD: notional is already in USD
+    notionalUSD = lots * 100000;
+  } else {
+    // Base currency is foreign (EURUSD, GBPUSD, …): price converts to USD
+    notionalUSD = lots * 100000 * openPrice;
+  }
+
+  return parseFloat((notionalUSD / leverage).toFixed(2));
+}
+
+/**
+ * Calculate the floating P&L for an open position (result in USD).
+ *
+ * @param {string} type     'BUY' | 'SELL'
+ * @param {string} symbol
+ * @param {number} lots
+ * @param {number} openPrice
+ * @param {number} currentPrice  Current bid (for BUY) or ask (for SELL)
+ * @returns {number} profit/loss in USD
+ */
+function calculatePnL(type, symbol, lots, openPrice, currentPrice) {
+  const isCrypto = symbol === 'BTCUSD' || symbol === 'ETHUSD';
+  const isJPY    = symbol.includes('JPY');
+  const isXAU    = symbol === 'XAUUSD';
+
+  let priceDiff  = currentPrice - openPrice;
+  if (type === 'SELL') priceDiff = -priceDiff;
+
+  let pnl;
+  if (isCrypto) {
+    pnl = lots * priceDiff;
+  } else if (isXAU) {
+    pnl = lots * METAL_CONTRACT.XAUUSD * priceDiff;
+  } else if (USD_BASE_SYMBOLS.has(symbol)) {
+    // USD is base: P&L denominated in quote currency, convert back to USD
+    const pipValue = isJPY ? 0.01 : 0.0001;
+    const pips     = priceDiff / pipValue;
+    // Each pip for USD-base pair = $1 per mini-lot (10,000 units) → $10 per std lot
+    // More precisely: P&L_in_quote = priceDiff × lots × 100,000
+    // P&L_in_USD = P&L_in_quote / currentPrice
+    pnl = (priceDiff * lots * 100000) / currentPrice;
+  } else {
+    // xxx/USD pair: priceDiff is already in USD
+    pnl = priceDiff * lots * 100000;
+  }
+
+  return parseFloat(pnl.toFixed(2));
+}
+
+module.exports = { calculateMargin, calculatePnL };
+
+```
+
+---
+
+## Backend — Tests
+
+## backend/__tests__/tradingEngine.test.js
+
+```js
+/**
+ * Tests for the core trading engine (order placement, closure, margin calc).
+ */
+
+const { calculateMargin, calculatePnL } = require('../utils/margin');
+const tradingEngine = require('../services/tradingEngine');
+const db = require('../models');
+
+// Seed a test account + quotes before tests
+let testAccountId;
+
+beforeAll(() => {
+  // Create a test user + account
+  const user = db.createUser('test@vda.trade', 'Test1234!', 'Test Trader', 'trader');
+  const account = db.createAccount(user.id, { balance: 10000, equity: 10000, freeMargin: 10000, leverage: 100 });
+  testAccountId = account.id;
+
+  // Seed quotes
+  db.quotes.set('EURUSD', { bid: 1.08500, ask: 1.08510, time: new Date().toISOString() });
+  db.quotes.set('USDJPY', { bid: 149.500, ask: 149.520, time: new Date().toISOString() });
+  db.quotes.set('BTCUSD', { bid: 52000.0, ask: 52005.0, time: new Date().toISOString() });
+});
+
+// ── Margin calculator ──────────────────────────────────────────────────────
+
+describe('calculateMargin', () => {
+  test('EURUSD 0.1 lots @ 1.0850 with 100:1 leverage', () => {
+    const margin = calculateMargin('EURUSD', 0.1, 1.0850, 100);
+    expect(margin).toBeCloseTo(108.50, 1);
+  });
+
+  test('USDJPY 1 lot @ 149.50 with 100:1 leverage', () => {
+    // USD is base currency → margin = 1 × 100,000 / 100 = 1,000 USD
+    const margin = calculateMargin('USDJPY', 1.0, 149.50, 100);
+    expect(margin).toBeCloseTo(1000.00, 1);
+  });
+
+  test('BTCUSD 0.1 lots @ 52000 with 10:1 leverage', () => {
+    // contract size = 1 for crypto
+    const margin = calculateMargin('BTCUSD', 0.1, 52000, 10);
+    expect(margin).toBeCloseTo(520.00, 1);
+  });
+});
+
+// ── P&L calculator ─────────────────────────────────────────────────────────
+
+describe('calculatePnL', () => {
+  test('BUY EURUSD 1 lot: +10 pip profit', () => {
+    const pnl = calculatePnL('BUY', 'EURUSD', 1.0, 1.08500, 1.08600);
+    expect(pnl).toBeCloseTo(100, 0);
+  });
+
+  test('SELL EURUSD 1 lot: 10 pip profit (price goes down)', () => {
+    const pnl = calculatePnL('SELL', 'EURUSD', 1.0, 1.08600, 1.08500);
+    expect(pnl).toBeCloseTo(100, 0);
+  });
+
+  test('BUY EURUSD 1 lot: loss when price drops', () => {
+    const pnl = calculatePnL('BUY', 'EURUSD', 1.0, 1.08600, 1.08500);
+    expect(pnl).toBeCloseTo(-100, 0);
+  });
+
+  test('SELL USDJPY 1 lot: profit when price drops', () => {
+    const pnl = calculatePnL('SELL', 'USDJPY', 1.0, 149.50, 149.40);
+    expect(pnl).toBeGreaterThan(0);
+  });
+});
+
+// ── Order placement ────────────────────────────────────────────────────────
+
+describe('tradingEngine.placeOrder', () => {
+  test('places a BUY market order successfully', () => {
+    const result = tradingEngine.placeOrder({
+      accountId: testAccountId,
+      symbol: 'EURUSD',
+      type: 'BUY',
+      lots: 0.1,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.order).toBeDefined();
+    expect(result.order.type).toBe('BUY');
+    expect(result.order.symbol).toBe('EURUSD');
+    expect(result.order.lots).toBe(0.1);
+    expect(db.openOrders.has(result.order.ticket)).toBe(true);
+  });
+
+  test('places a SELL market order successfully', () => {
+    const result = tradingEngine.placeOrder({
+      accountId: testAccountId,
+      symbol: 'EURUSD',
+      type: 'SELL',
+      lots: 0.05,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.order.type).toBe('SELL');
+  });
+
+  test('rejects order with invalid lots', () => {
+    const result = tradingEngine.placeOrder({
+      accountId: testAccountId,
+      symbol: 'EURUSD',
+      type: 'BUY',
+      lots: 0,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/invalid lot/i);
+  });
+
+  test('rejects order for unknown account', () => {
+    const result = tradingEngine.placeOrder({
+      accountId: 'non-existent',
+      symbol: 'EURUSD',
+      type: 'BUY',
+      lots: 0.1,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/account not found/i);
+  });
+
+  test('places a pending BUY LIMIT order', () => {
+    const result = tradingEngine.placeOrder({
+      accountId: testAccountId,
+      symbol: 'EURUSD',
+      type: 'BUY LIMIT',
+      lots: 0.1,
+      price: 1.08000,
+    });
+    expect(result.ok).toBe(true);
+    expect(db.pendingOrders.has(result.order.ticket)).toBe(true);
+  });
+});
+
+// ── Order closure ──────────────────────────────────────────────────────────
+
+describe('tradingEngine.closeOrder', () => {
+  test('closes an open order and records profit', () => {
+    // First place an order
+    const { order } = tradingEngine.placeOrder({
+      accountId: testAccountId,
+      symbol: 'EURUSD',
+      type: 'BUY',
+      lots: 0.1,
+    });
+    expect(order).toBeDefined();
+
+    const result = tradingEngine.closeOrder(order.ticket);
+    expect(result.ok).toBe(true);
+    expect(db.openOrders.has(order.ticket)).toBe(false);
+    expect(db.closedOrders.has(order.ticket)).toBe(true);
+  });
+
+  test('returns error for non-existent ticket', () => {
+    const result = tradingEngine.closeOrder(99999);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+});
+
+// ── Order modification ─────────────────────────────────────────────────────
+
+describe('tradingEngine.modifyOrder', () => {
+  test('modifies SL/TP of an open order', () => {
+    const { order } = tradingEngine.placeOrder({
+      accountId: testAccountId,
+      symbol: 'EURUSD',
+      type: 'BUY',
+      lots: 0.1,
+    });
+    const result = tradingEngine.modifyOrder(order.ticket, { sl: 1.08000, tp: 1.09000 });
+    expect(result.ok).toBe(true);
+    expect(result.order.sl).toBe(1.08000);
+    expect(result.order.tp).toBe(1.09000);
+  });
+});
+
+```
+
+---
+
+## Database (PostgreSQL)
+
+SQL files for creating the database schema, running migrations, and seeding
+demo data. Use these with a PostgreSQL database.
+
+```
+psql -U postgres -d vda_trading -f database/schema.sql
+psql -U postgres -d vda_trading -f database/seeds.sql
+```
+
+## database/schema.sql
+
+```sql
+-- VDA Trading Terminal – PostgreSQL Database Schema
+-- ====================================================
+-- This schema describes the production database structure.
+-- The backend/models/index.js provides an equivalent in-memory
+-- implementation that works without a database connection.
+
+-- ── Extensions ──────────────────────────────────────────────────────────
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ── Users ────────────────────────────────────────────────────────────────
+CREATE TABLE users (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    name          VARCHAR(255) NOT NULL,
+    role          VARCHAR(50)  NOT NULL DEFAULT 'trader' CHECK (role IN ('admin', 'trader', 'manager')),
+    is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_email ON users (email);
+
+-- ── Trading accounts ─────────────────────────────────────────────────────
+CREATE TABLE accounts (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id       UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    login         VARCHAR(20)  NOT NULL UNIQUE,
+    server        VARCHAR(100) NOT NULL DEFAULT 'VDA-Demo',
+    currency      CHAR(3)      NOT NULL DEFAULT 'USD',
+    leverage      INTEGER      NOT NULL DEFAULT 100 CHECK (leverage BETWEEN 1 AND 3000),
+    balance       NUMERIC(18,2) NOT NULL DEFAULT 10000.00,
+    equity        NUMERIC(18,2) NOT NULL DEFAULT 10000.00,
+    margin        NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    free_margin   NUMERIC(18,2) NOT NULL DEFAULT 10000.00,
+    margin_level  NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    profit        NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_accounts_user_id ON accounts (user_id);
+CREATE INDEX idx_accounts_login   ON accounts (login);
+
+-- ── Symbols ──────────────────────────────────────────────────────────────
+CREATE TABLE symbols (
+    id            SERIAL       PRIMARY KEY,
+    name          VARCHAR(20)  NOT NULL UNIQUE,
+    description   VARCHAR(100),
+    digits        INTEGER      NOT NULL DEFAULT 5,
+    contract_size INTEGER      NOT NULL DEFAULT 100000,
+    spread        NUMERIC(10,5) NOT NULL DEFAULT 0.0001,
+    is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO symbols (name, description, digits, contract_size, spread) VALUES
+    ('EURUSD', 'Euro vs US Dollar',       5, 100000, 0.00010),
+    ('GBPUSD', 'Pound vs US Dollar',      5, 100000, 0.00020),
+    ('USDJPY', 'US Dollar vs Yen',        3, 100000, 0.020),
+    ('XAUUSD', 'Gold vs US Dollar',       2, 100,    0.30),
+    ('USDCHF', 'US Dollar vs Swiss Franc',5, 100000, 0.00020),
+    ('AUDUSD', 'Aussie vs US Dollar',     5, 100000, 0.00020),
+    ('USDCAD', 'US Dollar vs Canadian',   5, 100000, 0.00020),
+    ('NZDUSD', 'NZD vs US Dollar',        5, 100000, 0.00030),
+    ('BTCUSD', 'Bitcoin vs US Dollar',    2, 1,      5.00),
+    ('ETHUSD', 'Ethereum vs US Dollar',   2, 1,      0.50);
+
+-- ── Price feed (tick data) ────────────────────────────────────────────────
+CREATE TABLE price_feed (
+    id         BIGSERIAL    PRIMARY KEY,
+    symbol     VARCHAR(20)  NOT NULL REFERENCES symbols(name),
+    bid        NUMERIC(18,5) NOT NULL,
+    ask        NUMERIC(18,5) NOT NULL,
+    time       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_price_feed_symbol_time ON price_feed (symbol, time DESC);
+
+-- ── OHLCV Candles ─────────────────────────────────────────────────────────
+CREATE TABLE candles (
+    id         BIGSERIAL    PRIMARY KEY,
+    symbol     VARCHAR(20)  NOT NULL REFERENCES symbols(name),
+    timeframe  VARCHAR(5)   NOT NULL,
+    open_time  BIGINT       NOT NULL,  -- Unix timestamp (seconds)
+    open       NUMERIC(18,5) NOT NULL,
+    high       NUMERIC(18,5) NOT NULL,
+    low        NUMERIC(18,5) NOT NULL,
+    close      NUMERIC(18,5) NOT NULL,
+    volume     INTEGER      NOT NULL DEFAULT 0,
+    UNIQUE (symbol, timeframe, open_time)
+);
+
+CREATE INDEX idx_candles_lookup ON candles (symbol, timeframe, open_time DESC);
+
+-- ── Orders ───────────────────────────────────────────────────────────────
+CREATE TYPE order_type AS ENUM (
+    'BUY', 'SELL',
+    'BUY LIMIT', 'SELL LIMIT',
+    'BUY STOP', 'SELL STOP'
+);
+
+CREATE TYPE order_status AS ENUM ('open', 'pending', 'closed', 'cancelled');
+
+CREATE TABLE orders (
+    ticket      BIGINT       PRIMARY KEY,
+    account_id  UUID         NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    symbol      VARCHAR(20)  NOT NULL REFERENCES symbols(name),
+    type        order_type   NOT NULL,
+    status      order_status NOT NULL DEFAULT 'open',
+    lots        NUMERIC(10,2) NOT NULL CHECK (lots > 0),
+    open_price  NUMERIC(18,5) NOT NULL,
+    close_price NUMERIC(18,5),
+    sl          NUMERIC(18,5),
+    tp          NUMERIC(18,5),
+    profit      NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    swap        NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    commission  NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    comment     VARCHAR(100)  DEFAULT '',
+    open_time   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    close_time  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_orders_account_status ON orders (account_id, status);
+CREATE INDEX idx_orders_symbol         ON orders (symbol);
+CREATE INDEX idx_orders_open_time      ON orders (open_time DESC);
+
+-- ── Trade history (materialised closed orders) ────────────────────────────
+CREATE TABLE trade_history (
+    id            BIGSERIAL    PRIMARY KEY,
+    ticket        BIGINT       NOT NULL REFERENCES orders(ticket),
+    account_id    UUID         NOT NULL REFERENCES accounts(id),
+    symbol        VARCHAR(20)  NOT NULL,
+    type          VARCHAR(20)  NOT NULL,
+    lots          NUMERIC(10,2) NOT NULL,
+    open_price    NUMERIC(18,5) NOT NULL,
+    close_price   NUMERIC(18,5) NOT NULL,
+    profit        NUMERIC(18,2) NOT NULL,
+    swap          NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    commission    NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    open_time     TIMESTAMPTZ  NOT NULL,
+    close_time    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_trade_history_account ON trade_history (account_id, close_time DESC);
+
+-- ── Margin records ────────────────────────────────────────────────────────
+CREATE TABLE margin_records (
+    id            BIGSERIAL    PRIMARY KEY,
+    account_id    UUID         NOT NULL REFERENCES accounts(id),
+    balance       NUMERIC(18,2) NOT NULL,
+    equity        NUMERIC(18,2) NOT NULL,
+    margin        NUMERIC(18,2) NOT NULL,
+    free_margin   NUMERIC(18,2) NOT NULL,
+    margin_level  NUMERIC(10,2) NOT NULL,
+    recorded_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_margin_account_time ON margin_records (account_id, recorded_at DESC);
+
+-- ── Broker exposure (risk snapshot) ──────────────────────────────────────
+CREATE TABLE broker_exposure (
+    id             BIGSERIAL    PRIMARY KEY,
+    symbol         VARCHAR(20)  NOT NULL REFERENCES symbols(name),
+    buy_lots       NUMERIC(12,2) NOT NULL DEFAULT 0,
+    sell_lots      NUMERIC(12,2) NOT NULL DEFAULT 0,
+    net_lots       NUMERIC(12,2) NOT NULL DEFAULT 0,
+    unrealised_pnl NUMERIC(18,2) NOT NULL DEFAULT 0,
+    snapshot_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_broker_exposure_time ON broker_exposure (snapshot_at DESC);
+
+-- ── Sessions (JWT refresh token store) ───────────────────────────────────
+CREATE TABLE sessions (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    refresh_token VARCHAR(512) NOT NULL UNIQUE,
+    expires_at   TIMESTAMPTZ NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked      BOOLEAN     NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX idx_sessions_user    ON sessions (user_id);
+CREATE INDEX idx_sessions_token   ON sessions (refresh_token);
+
+-- ── updated_at trigger helper ─────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER accounts_updated_at
+    BEFORE UPDATE ON accounts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+```
+
+## database/seeds.sql
+
+```sql
+-- VDA Trading Terminal – Demo / Development Seed Data
+-- =====================================================
+-- Populates the database with a set of demo users, trading accounts,
+-- symbols, open orders, and trade history so the platform is immediately
+-- usable after a fresh schema migration.
+--
+-- Usage:
+--   psql -d vda_trading -f database/schema.sql   # run once to create tables
+--   psql -d vda_trading -f database/seeds.sql    # load demo data
+--
+-- This script runs inside a single transaction.  Any error automatically
+-- triggers a full ROLLBACK so the database is never left in a partial state.
+--
+-- ⚠  CRITICAL: These credentials are for LOCAL DEVELOPMENT ONLY.
+--    Change ALL passwords immediately before deploying to any environment
+--    other than local development (staging, production, or any internet-
+--    accessible server).
+--
+-- Demo credentials:
+--   Super-admin:  superadmin@vda.trade  / SuperAdmin1234!
+--   Admin/Broker: admin@vda.trade       / Admin1234!
+--   Trader 1:     demo@vda.trade        / Demo1234!
+--   Trader 2:     trader2@vda.trade     / Trader1234!
+
+BEGIN;
+
+-- ── Extension needed for password hashing ────────────────────────────────
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ── Wipe existing seed data (idempotent re-run) ───────────────────────────
+DELETE FROM trade_history;
+DELETE FROM broker_exposure;
+DELETE FROM margin_records;
+DELETE FROM orders;
+DELETE FROM price_feed;
+DELETE FROM candles;
+DELETE FROM sessions;
+DELETE FROM accounts;
+DELETE FROM users;
+
+-- ── Users ─────────────────────────────────────────────────────────────────
+
+INSERT INTO users (id, email, password_hash, name, role, is_active) VALUES
+  ('00000000-0000-0000-0000-000000000001',
+   'superadmin@vda.trade',
+   crypt('SuperAdmin1234!', gen_salt('bf', 10)),
+   'Super Admin',
+   'admin',
+   TRUE),
+
+  ('00000000-0000-0000-0000-000000000002',
+   'admin@vda.trade',
+   crypt('Admin1234!', gen_salt('bf', 10)),
+   'VDA Admin',
+   'admin',
+   TRUE),
+
+  ('00000000-0000-0000-0000-000000000003',
+   'demo@vda.trade',
+   crypt('Demo1234!', gen_salt('bf', 10)),
+   'Demo Trader',
+   'trader',
+   TRUE),
+
+  ('00000000-0000-0000-0000-000000000004',
+   'trader2@vda.trade',
+   crypt('Trader1234!', gen_salt('bf', 10)),
+   'Jane Trader',
+   'trader',
+   TRUE);
+
+-- ── Trading accounts ──────────────────────────────────────────────────────
+
+INSERT INTO accounts (id, user_id, login, server, currency, leverage,
+                      balance, equity, margin, free_margin, margin_level, profit) VALUES
+  ('00000000-0000-0000-0001-000000000001',
+   '00000000-0000-0000-0000-000000000003',
+   '10001', 'VDA-Demo', 'USD', 100,
+   10000.00, 10150.50, 200.00, 9950.50, 5075.25, 150.50),
+
+  ('00000000-0000-0000-0001-000000000002',
+   '00000000-0000-0000-0000-000000000004',
+   '10002', 'VDA-Demo', 'USD', 200,
+   25000.00, 24820.00, 500.00, 24320.00, 4964.00, -180.00);
+
+-- ── Additional symbols (top-ups beyond schema.sql seed) ───────────────────
+-- The schema.sql INSERT uses ON CONFLICT DO NOTHING, so these are safe.
+
+INSERT INTO symbols (name, description, digits, contract_size, spread) VALUES
+  ('USDJPY', 'US Dollar vs Yen',          3, 100000, 0.02000),
+  ('XAUUSD', 'Gold vs US Dollar',         2,    100, 0.30000),
+  ('USDCHF', 'US Dollar vs Swiss Franc',  5, 100000, 0.00020),
+  ('AUDUSD', 'Aussie vs US Dollar',       5, 100000, 0.00020),
+  ('USDCAD', 'US Dollar vs Canadian',     5, 100000, 0.00020),
+  ('NZDUSD', 'NZD vs US Dollar',          5, 100000, 0.00030),
+  ('BTCUSD', 'Bitcoin vs US Dollar',      2,      1, 5.00000),
+  ('ETHUSD', 'Ethereum vs US Dollar',     2,      1, 0.50000)
+ON CONFLICT (name) DO NOTHING;
+
+-- ── Sample price feed (latest tick per symbol) ────────────────────────────
+
+INSERT INTO price_feed (symbol, bid, ask, time) VALUES
+  ('EURUSD', 1.08520, 1.08532, NOW() - INTERVAL '5 seconds'),
+  ('GBPUSD', 1.26840, 1.26858, NOW() - INTERVAL '5 seconds'),
+  ('USDJPY', 149.520, 149.542, NOW() - INTERVAL '5 seconds'),
+  ('XAUUSD', 2312.40, 2312.70, NOW() - INTERVAL '5 seconds'),
+  ('USDCHF', 0.89720, 0.89740, NOW() - INTERVAL '5 seconds'),
+  ('AUDUSD', 0.65480, 0.65498, NOW() - INTERVAL '5 seconds'),
+  ('USDCAD', 1.35620, 1.35640, NOW() - INTERVAL '5 seconds'),
+  ('NZDUSD', 0.59860, 0.59889, NOW() - INTERVAL '5 seconds'),
+  ('BTCUSD', 67450.00, 67455.00, NOW() - INTERVAL '5 seconds'),
+  ('ETHUSD', 3120.50, 3121.00, NOW() - INTERVAL '5 seconds');
+
+-- ── Open orders ───────────────────────────────────────────────────────────
+
+INSERT INTO orders (ticket, account_id, symbol, type, status, lots,
+                    open_price, sl, tp, profit, swap, commission, comment, open_time) VALUES
+  (1001,
+   '00000000-0000-0000-0001-000000000001',
+   'EURUSD', 'BUY', 'open', 0.10,
+   1.08450, 1.08000, 1.09000,
+   7.20, -0.10, -0.70, 'Demo long EURUSD', NOW() - INTERVAL '2 hours'),
+
+  (1002,
+   '00000000-0000-0000-0001-000000000001',
+   'XAUUSD', 'BUY', 'open', 0.05,
+   2308.00, 2280.00, 2360.00,
+   143.30, -0.20, -1.00, 'Gold long', NOW() - INTERVAL '1 hour'),
+
+  (1003,
+   '00000000-0000-0000-0001-000000000002',
+   'GBPUSD', 'SELL', 'open', 0.20,
+   1.26950, 1.27500, 1.26500,
+   -180.00, -0.30, -1.40, 'Short GBP', NOW() - INTERVAL '3 hours');
+
+-- ── Closed trade history ──────────────────────────────────────────────────
+
+INSERT INTO orders (ticket, account_id, symbol, type, status, lots,
+                    open_price, close_price, sl, tp, profit, swap, commission,
+                    comment, open_time, close_time) VALUES
+  (900,
+   '00000000-0000-0000-0001-000000000001',
+   'EURUSD', 'BUY', 'closed', 0.10,
+   1.07800, 1.08200, 1.07500, 1.08500,
+   40.00, -0.50, -0.70, 'Closed profit', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
+
+  (901,
+   '00000000-0000-0000-0001-000000000001',
+   'USDJPY', 'SELL', 'closed', 0.10,
+   150.200, 149.500, 150.800, 149.000,
+   47.00, -0.20, -0.70, 'JPY short win', NOW() - INTERVAL '3 days', NOW() - INTERVAL '2 days'),
+
+  (902,
+   '00000000-0000-0000-0001-000000000002',
+   'XAUUSD', 'BUY', 'closed', 0.05,
+   2295.00, 2310.00, 2280.00, 2330.00,
+   75.00, -0.30, -1.00, 'Gold scalp', NOW() - INTERVAL '4 days', NOW() - INTERVAL '3 days');
+
+INSERT INTO trade_history (ticket, account_id, symbol, type, lots,
+                           open_price, close_price, profit, swap, commission,
+                           open_time, close_time)
+-- orders.type is the order_type enum; trade_history.type is VARCHAR(20).
+-- The explicit cast converts the enum value to its text representation.
+SELECT ticket, account_id, symbol, type::text, lots,
+       open_price, close_price, profit, swap, commission,
+       open_time, close_time
+FROM   orders
+WHERE  status = 'closed';
+
+-- ── Margin snapshots ──────────────────────────────────────────────────────
+
+INSERT INTO margin_records (account_id, balance, equity, margin,
+                            free_margin, margin_level, recorded_at) VALUES
+  ('00000000-0000-0000-0001-000000000001',
+   10000.00, 10150.50, 200.00, 9950.50, 5075.25, NOW() - INTERVAL '1 hour'),
+  ('00000000-0000-0000-0001-000000000002',
+   25000.00, 24820.00, 500.00, 24320.00, 4964.00, NOW() - INTERVAL '1 hour');
+
+-- ── Broker exposure snapshot ──────────────────────────────────────────────
+
+INSERT INTO broker_exposure (symbol, buy_lots, sell_lots, net_lots,
+                             unrealised_pnl, snapshot_at) VALUES
+  ('EURUSD', 0.10, 0.00, 0.10,   7.20, NOW()),
+  ('GBPUSD', 0.00, 0.20, -0.20,-180.00, NOW()),
+  ('XAUUSD', 0.05, 0.00, 0.05, 143.30, NOW());
+
+COMMIT;
+
+```
+
+## database/migrations/001_create_users.sql
+
+```sql
+-- 001 – Create users table
+-- Run: psql -d vda_trading -f 001_create_users.sql
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS users (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    name          VARCHAR(255) NOT NULL,
+    role          VARCHAR(50)  NOT NULL DEFAULT 'trader'
+                               CHECK (role IN ('admin', 'trader', 'manager')),
+    is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+
+```
+
+## database/migrations/002_create_accounts_symbols.sql
+
+```sql
+-- 002 – Create accounts + symbols tables
+
+CREATE TABLE IF NOT EXISTS accounts (
+    id            UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id       UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    login         VARCHAR(20)   NOT NULL UNIQUE,
+    server        VARCHAR(100)  NOT NULL DEFAULT 'VDA-Demo',
+    currency      CHAR(3)       NOT NULL DEFAULT 'USD',
+    leverage      INTEGER       NOT NULL DEFAULT 100,
+    balance       NUMERIC(18,2) NOT NULL DEFAULT 10000.00,
+    equity        NUMERIC(18,2) NOT NULL DEFAULT 10000.00,
+    margin        NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    free_margin   NUMERIC(18,2) NOT NULL DEFAULT 10000.00,
+    margin_level  NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    profit        NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS symbols (
+    id            SERIAL        PRIMARY KEY,
+    name          VARCHAR(20)   NOT NULL UNIQUE,
+    description   VARCHAR(100),
+    digits        INTEGER       NOT NULL DEFAULT 5,
+    contract_size INTEGER       NOT NULL DEFAULT 100000,
+    spread        NUMERIC(10,5) NOT NULL DEFAULT 0.0001,
+    is_active     BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO symbols (name, description, digits, contract_size, spread)
+VALUES
+    ('EURUSD','Euro vs US Dollar',       5,100000,0.00010),
+    ('GBPUSD','Pound vs US Dollar',      5,100000,0.00020),
+    ('USDJPY','US Dollar vs Yen',        3,100000,0.020),
+    ('XAUUSD','Gold vs US Dollar',       2,100,   0.30),
+    ('USDCHF','US Dollar vs Swiss Franc',5,100000,0.00020),
+    ('AUDUSD','Aussie vs US Dollar',     5,100000,0.00020),
+    ('USDCAD','US Dollar vs Canadian',   5,100000,0.00020),
+    ('NZDUSD','NZD vs US Dollar',        5,100000,0.00030),
+    ('BTCUSD','Bitcoin vs US Dollar',    2,1,     5.00),
+    ('ETHUSD','Ethereum vs US Dollar',   2,1,     0.50)
+ON CONFLICT (name) DO NOTHING;
+
+```
+
+## database/migrations/003_create_orders_history.sql
+
+```sql
+-- 003 – Create orders, price feed, candles, trade history, broker exposure
+
+CREATE TYPE IF NOT EXISTS order_type AS ENUM (
+    'BUY','SELL','BUY LIMIT','SELL LIMIT','BUY STOP','SELL STOP');
+
+CREATE TYPE IF NOT EXISTS order_status AS ENUM (
+    'open','pending','closed','cancelled');
+
+CREATE TABLE IF NOT EXISTS orders (
+    ticket      BIGINT        PRIMARY KEY,
+    account_id  UUID          NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    symbol      VARCHAR(20)   NOT NULL REFERENCES symbols(name),
+    type        order_type    NOT NULL,
+    status      order_status  NOT NULL DEFAULT 'open',
+    lots        NUMERIC(10,2) NOT NULL CHECK (lots > 0),
+    open_price  NUMERIC(18,5) NOT NULL,
+    close_price NUMERIC(18,5),
+    sl          NUMERIC(18,5),
+    tp          NUMERIC(18,5),
+    profit      NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    swap        NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    commission  NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    comment     VARCHAR(100)  DEFAULT '',
+    open_time   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    close_time  TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS price_feed (
+    id      BIGSERIAL     PRIMARY KEY,
+    symbol  VARCHAR(20)   NOT NULL REFERENCES symbols(name),
+    bid     NUMERIC(18,5) NOT NULL,
+    ask     NUMERIC(18,5) NOT NULL,
+    time    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS candles (
+    id        BIGSERIAL     PRIMARY KEY,
+    symbol    VARCHAR(20)   NOT NULL REFERENCES symbols(name),
+    timeframe VARCHAR(5)    NOT NULL,
+    open_time BIGINT        NOT NULL,
+    open      NUMERIC(18,5) NOT NULL,
+    high      NUMERIC(18,5) NOT NULL,
+    low       NUMERIC(18,5) NOT NULL,
+    close     NUMERIC(18,5) NOT NULL,
+    volume    INTEGER       NOT NULL DEFAULT 0,
+    UNIQUE (symbol, timeframe, open_time)
+);
+
+CREATE TABLE IF NOT EXISTS trade_history (
+    id          BIGSERIAL     PRIMARY KEY,
+    ticket      BIGINT        NOT NULL REFERENCES orders(ticket),
+    account_id  UUID          NOT NULL REFERENCES accounts(id),
+    symbol      VARCHAR(20)   NOT NULL,
+    type        VARCHAR(20)   NOT NULL,
+    lots        NUMERIC(10,2) NOT NULL,
+    open_price  NUMERIC(18,5) NOT NULL,
+    close_price NUMERIC(18,5) NOT NULL,
+    profit      NUMERIC(18,2) NOT NULL,
+    swap        NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    commission  NUMERIC(18,2) NOT NULL DEFAULT 0.00,
+    open_time   TIMESTAMPTZ   NOT NULL,
+    close_time  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS broker_exposure (
+    id             BIGSERIAL     PRIMARY KEY,
+    symbol         VARCHAR(20)   NOT NULL REFERENCES symbols(name),
+    buy_lots       NUMERIC(12,2) NOT NULL DEFAULT 0,
+    sell_lots      NUMERIC(12,2) NOT NULL DEFAULT 0,
+    net_lots       NUMERIC(12,2) NOT NULL DEFAULT 0,
+    unrealised_pnl NUMERIC(18,2) NOT NULL DEFAULT 0,
+    snapshot_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS margin_records (
+    id           BIGSERIAL     PRIMARY KEY,
+    account_id   UUID          NOT NULL REFERENCES accounts(id),
+    balance      NUMERIC(18,2) NOT NULL,
+    equity       NUMERIC(18,2) NOT NULL,
+    margin       NUMERIC(18,2) NOT NULL,
+    free_margin  NUMERIC(18,2) NOT NULL,
+    margin_level NUMERIC(10,2) NOT NULL,
+    recorded_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+```
+
+---
+
+## Docker & Deployment
+
+Docker configuration for running the full stack (frontend + backend + database +
+nginx) with a single command:
+
+```
+docker-compose up --build
+```
+
+## Dockerfile.frontend
+
+```dockerfile
+# ── Stage 1: Build React frontend ────────────────────────────────────────
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY public/ ./public/
+COPY src/    ./src/
+
+ENV NODE_OPTIONS=--openssl-legacy-provider
+RUN npm run build
+
+# ── Stage 2: Production image (nginx) ────────────────────────────────────
+FROM nginx:1.27-alpine AS frontend
+
+COPY --from=frontend-builder /app/build /usr/share/nginx/html
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+```
+
+## Dockerfile.backend
+
+```dockerfile
+# VDA Trading Terminal – Backend API Server
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY backend/package.json backend/package-lock.json ./
+RUN npm ci --omit=dev
+
+# Copy source
+COPY backend/ .
+
+EXPOSE 5000
+
+ENV NODE_ENV=production
+ENV PORT=5000
+
+CMD ["node", "server.js"]
+
+```
+
+## docker-compose.yml
+
+```yaml
+version: "3.9"
+
+services:
+  # ── Backend API + WebSocket server ──────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: vda-backend
+    restart: unless-stopped
+    env_file: backend/.env.example   # copy to backend/.env for production
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+    ports:
+      - "5000:5000"
+    networks:
+      - vda-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── React frontend (nginx) ────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: vda-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vda-net
+
+networks:
+  vda-net:
+    driver: bridge
+
+```
+
+## docker/nginx.conf
+
+```nginx
+server {
+    listen       80;
+    server_name  _;
+    root         /usr/share/nginx/html;
+    index        index.html;
+
+    # Security headers
+    add_header X-Content-Type-Options "nosniff"            always;
+    add_header X-Frame-Options        "DENY"               always;
+    add_header X-XSS-Protection       "1; mode=block"      always;
+    add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
+
+    # Gzip
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
+    gzip_min_length 1024;
+
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # React SPA – serve index.html for all non-file routes
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API calls to backend service
+    location /api/ {
+        proxy_pass         http://backend:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # WebSocket proxy
+    location /ws {
+        proxy_pass         http://backend:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection "Upgrade";
+        proxy_set_header   Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+
+```
+
+---
+
+## Source Code — Additional UI Components
+
+## src/components/Login/Login.js
+
+```js
+import React, { useState } from 'react';
+import './Login.css';
+
+/**
+ * Login – Authentication screen.
+ *
+ * In demo (standalone) mode the form accepts any credentials and immediately
+ * calls onLogin('demo').
+ *
+ * When a REACT_APP_API_URL env var is set the form POSTs to the backend
+ * /api/auth/login endpoint and stores the returned JWT in localStorage.
+ *
+ * Props:
+ *   onLogin(role)  – called after successful authentication ('super_admin'|'admin'|'trader')
+ */
+const API_URL = process.env.REACT_APP_API_URL || '';
+
+const Login = ({ onLogin }) => {
+  const [email,    setEmail]    = useState('');
+  const [password, setPassword] = useState('');
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [isDemo,   setIsDemo]   = useState(!API_URL);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    // ── Demo (no backend) mode ────────────────────────────────────────────
+    // NOTE: Role detection from email is intentionally simple for demo/offline
+    // mode only. Production must validate roles server-side via JWT claims and
+    // NEVER trust client-supplied role data.
+    if (isDemo) {
+      setTimeout(() => {
+        setLoading(false);
+        // Role detection from email prefix
+        const e = email.toLowerCase();
+        if (e.includes('superadmin') || e.includes('super_admin') || e.includes('root')) {
+          onLogin('super_admin');
+        } else if (e.includes('admin')) {
+          onLogin('admin');
+        } else {
+          onLogin('trader');
+        }
+      }, 400);
+      return;
+    }
+
+    // ── Live API mode ─────────────────────────────────────────────────────
+    try {
+      const res  = await fetch(`${API_URL}/api/auth/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Login failed');
+        setLoading(false);
+        return;
+      }
+      localStorage.setItem('vda_token', data.token);
+      localStorage.setItem('vda_user',  JSON.stringify(data.user));
+      onLogin(data.user.role);
+    } catch {
+      setError('Cannot reach server. Switching to demo mode.');
+      setIsDemo(true);
+      setLoading(false);
+    }
+  };
+
+  const fillDemo = (role) => {
+    if (role === 'super_admin') { setEmail('superadmin@vda.trade'); setPassword('SuperAdmin1!'); }
+    else if (role === 'admin')  { setEmail('admin@vda.trade');      setPassword('Admin1234!'); }
+    else                        { setEmail('demo@vda.trade');        setPassword('Demo1234!'); }
+  };
+
+  return (
+    <div className="login-overlay">
+      <div className="login-card">
+        {/* ── Logo ─────────────────────────────────────────────────── */}
+        <div className="login-logo">
+          <span className="login-logo-vda">VDA</span>
+          <span className="login-logo-sub">Trading Terminal</span>
+        </div>
+
+        {/* ── Demo / Live badge ─────────────────────────────────── */}
+        <div className={`login-mode-badge ${isDemo ? 'demo' : 'live'}`}>
+          {isDemo ? '● DEMO MODE' : '● LIVE BACKEND'}
+        </div>
+
+        {/* ── Form ─────────────────────────────────────────────────── */}
+        <form className="login-form" onSubmit={handleSubmit}>
+          <div className="login-field">
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="username"
+              placeholder={isDemo ? 'any email to enter demo' : 'trader@broker.com'}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="login-field">
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              placeholder={isDemo ? 'any password' : '••••••••'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          {error && <div className="login-error">{error}</div>}
+
+          <button
+            type="submit"
+            className={`login-btn${loading ? ' loading' : ''}`}
+            disabled={loading}
+          >
+            {loading ? 'Connecting…' : 'Login'}
+          </button>
+        </form>
+
+        {/* ── Demo shortcuts ─────────────────────────────────────── */}
+        <div className="login-demo-row">
+          <span className="login-demo-label">Quick login:</span>
+          <button className="login-demo-btn" onClick={() => fillDemo('trader')}>Demo Trader</button>
+          <button className="login-demo-btn admin" onClick={() => fillDemo('admin')}>Demo Admin</button>
+          <button className="login-demo-btn superadmin" onClick={() => fillDemo('super_admin')}>Super Admin</button>
+        </div>
+
+        <p className="login-hint">
+          {isDemo
+            ? 'Running in offline demo mode – no server required.'
+            : `Connecting to ${API_URL}`}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
+
+```
+
+## src/components/BrokerMonitor/BrokerMonitor.js
+
+```js
+import React, { useState } from 'react';
+import { useSelector } from 'react-redux';
+import { formatProfit } from '../../utils/formatters';
+import './BrokerMonitor.css';
+
+/**
+ * BrokerMonitor – Admin / Broker risk monitoring dashboard.
+ *
+ * Aggregates all open positions across all accounts to show:
+ *  • Symbol-level buy/sell exposure and net lots
+ *  • Per-account equity snapshot
+ *  • Total floating P&L
+ *
+ * In standalone mode this reads from the Redux store (all positions are
+ * single-account).  When connected to the backend the data is supplemented
+ * via the /api/admin/risk endpoint.
+ */
+const BrokerMonitor = () => {
+  const { openOrders } = useSelector((s) => s.orders);
+  const account        = useSelector((s) => s.account);
+  const { quotes }     = useSelector((s) => s.market);
+  const [tab, setTab]  = useState('exposure'); // 'exposure' | 'accounts' | 'marginCall'
+
+  // ── Aggregate symbol exposure ────────────────────────────────────────────
+  const exposureMap = {};
+  openOrders.forEach((order) => {
+    if (!exposureMap[order.symbol]) {
+      exposureMap[order.symbol] = { symbol: order.symbol, buyLots: 0, sellLots: 0, netLots: 0, pnl: 0 };
+    }
+    const exp = exposureMap[order.symbol];
+    if (order.type === 'BUY') exp.buyLots  = +(exp.buyLots  + order.lots).toFixed(2);
+    else                      exp.sellLots = +(exp.sellLots + order.lots).toFixed(2);
+    exp.netLots = +(exp.buyLots - exp.sellLots).toFixed(2);
+    exp.pnl     = +(exp.pnl + (order.profit || 0)).toFixed(2);
+  });
+  const exposureRows = Object.values(exposureMap);
+
+  const totalPnL   = openOrders.reduce((s, o) => s + (o.profit || 0), 0);
+  const totalLots  = openOrders.reduce((s, o) => s + o.lots, 0);
+  const atRisk     = account.marginLevel > 0 && account.marginLevel < 150;
+
+  // ── Account snapshot (single account in frontend mode) ──────────────────
+  const accountRows = [{
+    login:       account.login,
+    balance:     account.balance,
+    equity:      account.equity,
+    margin:      account.margin,
+    marginLevel: account.marginLevel,
+    profit:      account.profit,
+    openOrders:  openOrders.length,
+  }];
+
+  // ── Margin-call risk orders (SL very close to current price) ─────────────
+  const marginRiskOrders = openOrders.filter((o) => {
+    if (!o.sl) return false;
+    const q = quotes[o.symbol];
+    if (!q) return false;
+    const currentPrice = o.type === 'BUY' ? q.bid : q.ask;
+    const dist = Math.abs(currentPrice - o.sl) / currentPrice;
+    return dist < 0.005; // within 0.5% of SL
+  });
+
+  return (
+    <div className="broker-monitor">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="bm-header">
+        <span className="bm-title">🛡 Broker Risk Monitor</span>
+        <div className="bm-stats">
+          <span className="bm-stat">
+            Open Positions: <strong>{openOrders.length}</strong>
+          </span>
+          <span className="bm-stat">
+            Total Lots: <strong>{totalLots.toFixed(2)}</strong>
+          </span>
+          <span className={`bm-stat${totalPnL >= 0 ? ' positive' : ' negative'}`}>
+            Float P&L: <strong>{formatProfit(totalPnL)}</strong>
+          </span>
+          {atRisk && (
+            <span className="bm-alert">⚠ LOW MARGIN LEVEL: {account.marginLevel.toFixed(1)}%</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Tabs ───────────────────────────────────────────────────────── */}
+      <div className="bm-tabs">
+        {['exposure', 'accounts', 'marginCall'].map((t) => (
+          <button
+            key={t}
+            className={`bm-tab${tab === t ? ' active' : ''}`}
+            onClick={() => setTab(t)}
+          >
+            {t === 'exposure'   ? '📊 Symbol Exposure' :
+             t === 'accounts'   ? '👤 Accounts' :
+                                  `⚠ Margin Risk${marginRiskOrders.length > 0 ? ` (${marginRiskOrders.length})` : ''}`}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Symbol exposure table ──────────────────────────────────────── */}
+      {tab === 'exposure' && (
+        <div className="bm-table-wrap">
+          <table className="bm-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Buy Lots</th>
+                <th>Sell Lots</th>
+                <th>Net Lots</th>
+                <th>Float P&L</th>
+                <th>Bid</th>
+                <th>Ask</th>
+              </tr>
+            </thead>
+            <tbody>
+              {exposureRows.length === 0 ? (
+                <tr><td colSpan={7} className="empty">No open positions</td></tr>
+              ) : (
+                exposureRows.map((row) => {
+                  const q = quotes[row.symbol] || {};
+                  return (
+                    <tr key={row.symbol} className={Math.abs(row.netLots) > 2 ? 'high-risk' : ''}>
+                      <td className="sym">{row.symbol}</td>
+                      <td className="buy-type">{row.buyLots}</td>
+                      <td className="sell-type">{row.sellLots}</td>
+                      <td className={row.netLots > 0 ? 'buy-type' : row.netLots < 0 ? 'sell-type' : ''}>
+                        {row.netLots > 0 ? '+' : ''}{row.netLots}
+                      </td>
+                      <td className={row.pnl >= 0 ? 'positive' : 'negative'}>
+                        {formatProfit(row.pnl)}
+                      </td>
+                      <td>{q.bid ? q.bid.toFixed(5) : '—'}</td>
+                      <td>{q.ask ? q.ask.toFixed(5) : '—'}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+            {exposureRows.length > 0 && (
+              <tfoot>
+                <tr className="totals-row">
+                  <td><strong>TOTAL</strong></td>
+                  <td>{exposureRows.reduce((s, r) => +(s + r.buyLots).toFixed(2), 0)}</td>
+                  <td>{exposureRows.reduce((s, r) => +(s + r.sellLots).toFixed(2), 0)}</td>
+                  <td></td>
+                  <td className={totalPnL >= 0 ? 'positive' : 'negative'}>
+                    <strong>{formatProfit(totalPnL)}</strong>
+                  </td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      )}
+
+      {/* ── Account snapshot table ─────────────────────────────────────── */}
+      {tab === 'accounts' && (
+        <div className="bm-table-wrap">
+          <table className="bm-table">
+            <thead>
+              <tr>
+                <th>Login</th>
+                <th>Balance</th>
+                <th>Equity</th>
+                <th>Margin</th>
+                <th>Margin Level</th>
+                <th>Float P&L</th>
+                <th>Open Orders</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accountRows.map((a, i) => (
+                <tr key={i} className={a.marginLevel > 0 && a.marginLevel < 150 ? 'high-risk' : ''}>
+                  <td>{a.login}</td>
+                  <td>${a.balance.toFixed(2)}</td>
+                  <td>${a.equity.toFixed(2)}</td>
+                  <td>${a.margin.toFixed(2)}</td>
+                  <td className={a.marginLevel < 100 ? 'negative' : a.marginLevel < 200 ? 'warn' : 'positive'}>
+                    {a.marginLevel > 0 ? `${a.marginLevel.toFixed(1)}%` : '—'}
+                  </td>
+                  <td className={a.profit >= 0 ? 'positive' : 'negative'}>
+                    {formatProfit(a.profit)}
+                  </td>
+                  <td>{a.openOrders}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Margin risk orders ─────────────────────────────────────────── */}
+      {tab === 'marginCall' && (
+        <div className="bm-table-wrap">
+          <table className="bm-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th>Lots</th>
+                <th>Open Price</th>
+                <th>SL</th>
+                <th>Current</th>
+                <th>Dist to SL</th>
+                <th>P&L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {marginRiskOrders.length === 0 ? (
+                <tr><td colSpan={9} className="empty">No orders near stop-loss</td></tr>
+              ) : (
+                marginRiskOrders.map((o) => {
+                  const q = quotes[o.symbol] || {};
+                  const currentPrice = o.type === 'BUY' ? q.bid : q.ask;
+                  const dist = o.sl ? Math.abs(currentPrice - o.sl) : null;
+                  return (
+                    <tr key={o.ticket} className="high-risk">
+                      <td>{o.ticket}</td>
+                      <td className="sym">{o.symbol}</td>
+                      <td className={o.type === 'BUY' ? 'buy-type' : 'sell-type'}>{o.type}</td>
+                      <td>{o.lots}</td>
+                      <td>{o.openPrice}</td>
+                      <td className="sl">{o.sl}</td>
+                      <td>{currentPrice ? currentPrice.toFixed(5) : '—'}</td>
+                      <td className="negative">{dist ? dist.toFixed(5) : '—'}</td>
+                      <td className={o.profit >= 0 ? 'positive' : 'negative'}>
+                        {formatProfit(o.profit)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BrokerMonitor;
+
+```
+
+## src/components/MarketFeed/MarketFeed.js
+
+```js
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import './MarketFeed.css';
+
+/* ── Static feed data ─────────────────────────────────────────────────────── */
+
+const FEED_CARDS = [
+  {
+    id: 1,
+    symbol: 'EUR/USD',
+    direction: 'BUY',
+    price: '1.08423',
+    change: '+0.42%',
+    positive: true,
+    signalType: 'Breakout Signal',
+    analyst: '@MarketHawk',
+    avatar: '🦅',
+    time: '2 min ago',
+    description:
+      'EUR/USD broke above key resistance at 1.0840. RSI momentum confirms bullish continuation. Next target: 1.0880.',
+    tags: ['#forex', '#breakout', '#eurusd'],
+    likes: 1247,
+    comments: 84,
+    bookmarks: 312,
+    shares: 218,
+    sparkline: [40, 38, 42, 39, 44, 47, 45, 50, 53, 55, 52, 58],
+    gradient: ['#0d47a1', '#1565c0'],
+    accent: '#42a5f5',
+  },
+  {
+    id: 2,
+    symbol: 'BTC/USD',
+    direction: 'SELL',
+    price: '67,210',
+    change: '-1.83%',
+    positive: false,
+    signalType: 'Reversal Alert',
+    analyst: '@CryptoVision',
+    avatar: '🔮',
+    time: '5 min ago',
+    description:
+      'Bitcoin rejected at $68,000 resistance for the third time. Bearish engulfing pattern on 4H chart. Watch for a pullback to $64,500.',
+    tags: ['#bitcoin', '#crypto', '#reversal'],
+    likes: 3891,
+    comments: 256,
+    bookmarks: 904,
+    shares: 531,
+    sparkline: [70, 72, 71, 74, 73, 69, 65, 63, 67, 65, 62, 60],
+    gradient: ['#4a148c', '#6a1b9a'],
+    accent: '#ce93d8',
+  },
+  {
+    id: 3,
+    symbol: 'GOLD',
+    direction: 'BUY',
+    price: '2,334.50',
+    change: '+0.77%',
+    positive: true,
+    signalType: 'Safe Haven Flow',
+    analyst: '@GoldBull',
+    avatar: '🏆',
+    time: '11 min ago',
+    description:
+      'Gold surging on geopolitical tensions. Inverse correlation with USD strengthening. Institutional buying confirmed above $2,320. Strong momentum toward $2,360.',
+    tags: ['#gold', '#commodities', '#safehaven'],
+    likes: 2156,
+    comments: 147,
+    bookmarks: 530,
+    shares: 276,
+    sparkline: [30, 32, 34, 31, 35, 38, 40, 42, 39, 44, 46, 48],
+    gradient: ['#e65100', '#bf360c'],
+    accent: '#ffcc02',
+  },
+  {
+    id: 4,
+    symbol: 'GBP/JPY',
+    direction: 'SELL',
+    price: '191.340',
+    change: '-0.55%',
+    positive: false,
+    signalType: 'Overbought RSI',
+    analyst: '@FX_Maestro',
+    avatar: '🎯',
+    time: '18 min ago',
+    description:
+      'GBP/JPY RSI hit 78 — deep overbought territory. MACD divergence appearing on 1H. Risk-off sentiment building across JPY pairs.',
+    tags: ['#gbpjpy', '#rsi', '#forex'],
+    likes: 897,
+    comments: 63,
+    bookmarks: 218,
+    shares: 104,
+    sparkline: [60, 62, 64, 66, 65, 63, 61, 59, 57, 55, 54, 52],
+    gradient: ['#1b5e20', '#2e7d32'],
+    accent: '#81c784',
+  },
+  {
+    id: 5,
+    symbol: 'S&P 500',
+    direction: 'BUY',
+    price: '5,241.0',
+    change: '+0.31%',
+    positive: true,
+    signalType: 'Trend Continuation',
+    analyst: '@WallStreetEdge',
+    avatar: '📊',
+    time: '24 min ago',
+    description:
+      'S&P 500 holding above 5,200 support — bullish structure intact. Tech sector leading gains. Q1 earnings season beat expectations by 8%. Watch 5,260 as next resistance.',
+    tags: ['#sp500', '#stocks', '#usa'],
+    likes: 5432,
+    comments: 378,
+    bookmarks: 1201,
+    shares: 689,
+    sparkline: [45, 43, 47, 48, 46, 49, 51, 50, 52, 54, 53, 56],
+    gradient: ['#006064', '#00838f'],
+    accent: '#4dd0e1',
+  },
+  {
+    id: 6,
+    symbol: 'USD/JPY',
+    direction: 'BUY',
+    price: '149.870',
+    change: '+0.19%',
+    positive: true,
+    signalType: 'Carry Trade',
+    analyst: '@MacroTrader',
+    avatar: '🌐',
+    time: '31 min ago',
+    description:
+      'USD/JPY carry trade back in play as Fed holds rates. BOJ signals no imminent hike. Watch for intervention risk above 151.00 — manage your size carefully.',
+    tags: ['#usdjpy', '#carrytrade', '#forex'],
+    likes: 1634,
+    comments: 112,
+    bookmarks: 445,
+    shares: 203,
+    sparkline: [50, 51, 52, 50, 53, 54, 52, 55, 56, 54, 57, 58],
+    gradient: ['#37474f', '#455a64'],
+    accent: '#b0bec5',
+  },
+];
+
+/* ── Sparkline SVG ────────────────────────────────────────────────────────── */
+
+const Sparkline = ({ data, positive, accent }) => {
+  const w = 160;
+  const h = 50;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((v - min) / range) * (h - 6) - 3;
+      return `${x},${y}`;
+    })
+    .join(' ');
+  const fillPts = `0,${h} ${pts} ${w},${h}`;
+
+  return (
+    <svg width={w} height={h} className="sparkline-svg">
+      <defs>
+        <linearGradient id={`sg-${positive}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={fillPts} fill={`url(#sg-${positive})`} />
+      <polyline points={pts} fill="none" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
+/* ── Single card ──────────────────────────────────────────────────────────── */
+
+const FeedCard = ({ card, active }) => {
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [likeCount, setLikeCount] = useState(card.likes);
+  const [showComment, setShowComment] = useState(false);
+  const [comment, setComment] = useState('');
+
+  const handleLike = () => {
+    setLiked((l) => !l);
+    setLikeCount((c) => (liked ? c - 1 : c + 1));
+  };
+
+  const formatCount = (n) =>
+    n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+
+  return (
+    <div
+      className={`feed-card${active ? ' feed-card--active' : ''}`}
+      style={{ background: `linear-gradient(160deg, ${card.gradient[0]} 0%, ${card.gradient[1]} 100%)` }}
+    >
+      {/* ── Background glow ─── */}
+      <div className="feed-card-glow" style={{ background: card.accent }} />
+
+      {/* ── Main content ─── */}
+      <div className="feed-card-content">
+        {/* Signal badge */}
+        <div className="feed-signal-badge" style={{ borderColor: card.accent, color: card.accent }}>
+          {card.signalType}
+        </div>
+
+        {/* Symbol + price */}
+        <div className="feed-symbol-row">
+          <span className="feed-symbol">{card.symbol}</span>
+          <span className={`feed-direction-tag feed-direction-tag--${card.direction.toLowerCase()}`}>
+            {card.direction}
+          </span>
+        </div>
+
+        <div className="feed-price-row">
+          <span className="feed-price">{card.price}</span>
+          <span className={`feed-change ${card.positive ? 'positive' : 'negative'}`}>
+            {card.change}
+          </span>
+        </div>
+
+        {/* Sparkline chart */}
+        <div className="feed-chart">
+          <Sparkline data={card.sparkline} positive={card.positive} accent={card.accent} />
+        </div>
+
+        {/* Description */}
+        <p className="feed-description">{card.description}</p>
+
+        {/* Tags */}
+        <div className="feed-tags">
+          {card.tags.map((t) => (
+            <span key={t} className="feed-tag" style={{ color: card.accent }}>{t}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Right action bar ─── */}
+      <div className="feed-actions">
+        <div className="feed-action-item">
+          <button
+            className={`feed-action-btn${liked ? ' liked' : ''}`}
+            onClick={handleLike}
+            aria-label="Like"
+          >
+            {liked ? '❤️' : '🤍'}
+          </button>
+          <span className="feed-action-count">{formatCount(likeCount)}</span>
+        </div>
+
+        <div className="feed-action-item">
+          <button
+            className={`feed-action-btn${showComment ? ' active' : ''}`}
+            onClick={() => setShowComment((s) => !s)}
+            aria-label="Comment"
+          >
+            💬
+          </button>
+          <span className="feed-action-count">{formatCount(card.comments)}</span>
+        </div>
+
+        <div className="feed-action-item">
+          <button
+            className={`feed-action-btn${saved ? ' saved' : ''}`}
+            onClick={() => setSaved((s) => !s)}
+            aria-label="Bookmark"
+          >
+            {saved ? '🔖' : '📌'}
+          </button>
+          <span className="feed-action-count">{formatCount(card.bookmarks)}</span>
+        </div>
+
+        <div className="feed-action-item">
+          <button className="feed-action-btn" aria-label="Share">📤</button>
+          <span className="feed-action-count">{formatCount(card.shares)}</span>
+        </div>
+      </div>
+
+      {/* ── Bottom: analyst info + trade button ─── */}
+      <div className="feed-bottom">
+        <div className="feed-analyst">
+          <span className="feed-analyst-avatar">{card.avatar}</span>
+          <div className="feed-analyst-info">
+            <span className="feed-analyst-name">{card.analyst}</span>
+            <span className="feed-analyst-time">{card.time}</span>
+          </div>
+        </div>
+        <button
+          className="feed-trade-btn"
+          style={{ background: card.accent, color: '#0a0a1a' }}
+        >
+          ⚡ Trade Now
+        </button>
+      </div>
+
+      {/* ── Comment input overlay ─── */}
+      {showComment && (
+        <div className="feed-comment-overlay">
+          <input
+            className="feed-comment-input"
+            placeholder="Add a comment…"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && comment.trim()) {
+                setComment('');
+                setShowComment(false);
+              }
+            }}
+            autoFocus
+          />
+          <button
+            className="feed-comment-send"
+            onClick={() => { setComment(''); setShowComment(false); }}
+          >
+            ↩
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── Bottom navigation bar ────────────────────────────────────────────────── */
+
+const BottomNav = ({ activeTab, onTabChange }) => {
+  const tabs = [
+    { id: 'home',    icon: '🏠', label: 'Feed'    },
+    { id: 'explore', icon: '🔍', label: 'Explore' },
+    { id: 'signals', icon: '⚡', label: 'Signals' },
+    { id: 'inbox',   icon: '💬', label: 'Inbox'   },
+    { id: 'profile', icon: '👤', label: 'Profile' },
+  ];
+
+  return (
+    <nav className="feed-bottom-nav">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          className={`feed-nav-btn${activeTab === t.id ? ' feed-nav-btn--active' : ''}`}
+          onClick={() => onTabChange(t.id)}
+        >
+          <span className="feed-nav-icon">{t.icon}</span>
+          <span className="feed-nav-label">{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+};
+
+/* ── Main MarketFeed component ────────────────────────────────────────────── */
+
+const MarketFeed = () => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('home');
+  const feedRef = useRef(null);
+
+  /* Snap scroll: detect which card is centred */
+  const onScroll = useCallback(() => {
+    if (!feedRef.current) return;
+    const el = feedRef.current;
+    const idx = Math.round(el.scrollTop / el.clientHeight);
+    setActiveIndex(idx);
+  }, []);
+
+  useEffect(() => {
+    const el = feedRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [onScroll]);
+
+  /* Keyboard navigation */
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === 'ArrowDown') {
+        const next = Math.min(activeIndex + 1, FEED_CARDS.length - 1);
+        feedRef.current?.scrollTo({ top: next * feedRef.current.clientHeight, behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        const prev = Math.max(activeIndex - 1, 0);
+        feedRef.current?.scrollTo({ top: prev * feedRef.current.clientHeight, behavior: 'smooth' });
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [activeIndex]);
+
+  return (
+    <div className="market-feed-wrapper">
+      {/* Progress dots */}
+      <div className="feed-progress-dots">
+        {FEED_CARDS.map((_, i) => (
+          <button
+            key={i}
+            className={`feed-dot${i === activeIndex ? ' feed-dot--active' : ''}`}
+            onClick={() =>
+              feedRef.current?.scrollTo({ top: i * feedRef.current.clientHeight, behavior: 'smooth' })
+            }
+            aria-label={`Go to card ${i + 1}`}
+          />
+        ))}
+      </div>
+
+      {/* Scroll container */}
+      <div className="feed-scroll-container" ref={feedRef}>
+        {FEED_CARDS.map((card, i) => (
+          <FeedCard key={card.id} card={card} active={i === activeIndex} />
+        ))}
+      </div>
+
+      {/* Bottom navigation */}
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+    </div>
+  );
+};
+
+export default MarketFeed;
+
+```
+
+## src/components/SuperAdmin/SuperAdmin.js
+
+```js
+import React, { useState, useCallback } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { formatProfit } from '../../utils/formatters';
+import {
+  CRM_ADD_CLIENT,
+  CRM_DELETE_CLIENT,
+  CRM_UPDATE_CLIENT,
+  UPDATE_ACCOUNT,
+  ADD_LOG,
+} from '../../store/actions/actionTypes';
+import './SuperAdmin.css';
+
+/**
+ * SuperAdmin – Super-Administrator control panel.
+ *
+ * Provides privileged operations beyond the broker dashboard:
+ *  • Global platform statistics
+ *  • User / broker account management (create, suspend, adjust balance)
+ *  • Symbol configuration (spread, leverage cap)
+ *  • Trade history review
+ *  • System settings
+ *
+ * Access: "super_admin" role only (set via Login component).
+ */
+
+// ── Symbol configuration defaults ──────────────────────────────────────────
+const DEFAULT_SYMBOLS = [
+  { symbol: 'EURUSD',  spread: 1.0, leverageCap: 500, active: true  },
+  { symbol: 'GBPUSD',  spread: 1.2, leverageCap: 500, active: true  },
+  { symbol: 'USDJPY',  spread: 1.0, leverageCap: 500, active: true  },
+  { symbol: 'USDCHF',  spread: 1.5, leverageCap: 500, active: true  },
+  { symbol: 'AUDUSD',  spread: 1.3, leverageCap: 500, active: true  },
+  { symbol: 'USDCAD',  spread: 1.4, leverageCap: 500, active: true  },
+  { symbol: 'NZDUSD',  spread: 1.6, leverageCap: 500, active: true  },
+  { symbol: 'XAUUSD',  spread: 3.0, leverageCap: 100, active: true  },
+  { symbol: 'XAGUSD',  spread: 4.0, leverageCap: 100, active: true  },
+  { symbol: 'BTCUSD',  spread: 50,  leverageCap: 10,  active: false },
+];
+
+const TABS = ['overview', 'accounts', 'symbols', 'trades', 'settings'];
+const TAB_LABELS = {
+  overview: '📊 Overview',
+  accounts: '👤 Accounts',
+  symbols:  '📈 Symbols',
+  trades:   '📋 Trades',
+  settings: '⚙️ Settings',
+};
+
+// ── Demo client names ────────────────────────────────────────────────────────
+const DEMO_CLIENT_NAMES = ['Alice Johnson', 'Bob Chen', 'Carlos Ruiz', 'Diana Park', 'Ethan Walsh'];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+// Use Web Crypto API when available; fall back for environments that don't support it.
+const newId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
+  }
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+};
+
+const SuperAdmin = () => {
+  const dispatch   = useDispatch();
+  const orders     = useSelector((s) => s.orders);
+  const account    = useSelector((s) => s.account);
+  const crmClients = useSelector((s) => s.crm.clients);
+
+  const [tab, setTab]              = useState('overview');
+  const [symbols, setSymbols]      = useState(DEFAULT_SYMBOLS);
+  const [brokers, setBrokers]      = useState([
+    { id: 'B001', name: 'VDA Prime Broker', email: 'broker@vda.trade',  role: 'broker',      status: 'active',    clients: crmClients.length, balance: 250000 },
+    { id: 'B002', name: 'Alpha Capital',    email: 'alpha@cap.trade',   role: 'broker',      status: 'active',    clients: 34,                balance: 180000 },
+    { id: 'B003', name: 'TestBroker',       email: 'test@broker.com',   role: 'broker',      status: 'suspended', clients: 2,                 balance: 5000   },
+  ]);
+  const [settings, setSettings]    = useState({
+    maxLeverage:       500,
+    minDeposit:        100,
+    maintenanceMode:   false,
+    registrationOpen:  true,
+    defaultCurrency:   'USD',
+    platformName:      'VDA Trading Terminal',
+    supportEmail:      'support@vda.trade',
+  });
+  const [newBroker, setNewBroker]  = useState({ name: '', email: '', role: 'broker' });
+  const [adjTarget, setAdjTarget]  = useState('');
+  const [adjAmount, setAdjAmount]  = useState('');
+  const [adjNote,   setAdjNote]    = useState('');
+  const [msg,       setMsg]        = useState('');
+
+  // ── Flash message helper ─────────────────────────────────────────────────
+  const flash = useCallback((text) => {
+    setMsg(text);
+    setTimeout(() => setMsg(''), 3000);
+  }, []);
+
+  // ── Computed overview stats ──────────────────────────────────────────────
+  const totalOpenOrders  = orders.openOrders.length;
+  const totalPnL         = orders.openOrders.reduce((s, o) => s + (o.profit || 0), 0);
+  const closedOrders     = orders.closedOrders || [];
+  const totalVolume      = [...orders.openOrders, ...closedOrders].reduce((s, o) => s + o.lots, 0);
+  const activeAccounts   = brokers.filter((b) => b.status === 'active').length;
+  const suspendedCount   = brokers.filter((b) => b.status === 'suspended').length;
+  const totalClients     = brokers.reduce((s, b) => s + b.clients, 0);
+
+  // ── Create broker account ────────────────────────────────────────────────
+  const handleCreateBroker = () => {
+    if (!newBroker.name.trim() || !newBroker.email.trim()) {
+      flash('Name and email are required.');
+      return;
+    }
+    const broker = {
+      id:      `B${newId()}`,
+      name:    newBroker.name.trim(),
+      email:   newBroker.email.trim(),
+      role:    newBroker.role,
+      status:  'active',
+      clients: 0,
+      balance: 0,
+    };
+    setBrokers((prev) => [...prev, broker]);
+    dispatch({ type: ADD_LOG, payload: `[ADMIN] Created broker "${broker.name}" (${broker.email})` });
+    setNewBroker({ name: '', email: '', role: 'broker' });
+    flash(`Broker "${broker.name}" created.`);
+  };
+
+  // ── Suspend / reinstate account ──────────────────────────────────────────
+  const handleToggleSuspend = (id) => {
+    setBrokers((prev) =>
+      prev.map((b) =>
+        b.id === id
+          ? { ...b, status: b.status === 'active' ? 'suspended' : 'active' }
+          : b
+      )
+    );
+    const broker = brokers.find((b) => b.id === id);
+    if (broker) {
+      const next = broker.status === 'active' ? 'suspended' : 'active';
+      dispatch({ type: ADD_LOG, payload: `[ADMIN] Account "${broker.name}" set to ${next}` });
+      flash(`"${broker.name}" is now ${next}.`);
+    }
+  };
+
+  // ── Balance adjustment (demo account) ────────────────────────────────────
+  const handleAdjustBalance = () => {
+    const amount = parseFloat(adjAmount);
+    if (isNaN(amount)) { flash('Enter a valid amount.'); return; }
+    dispatch({ type: UPDATE_ACCOUNT, payload: { balance: Math.max(0, account.balance + amount) } });
+    dispatch({ type: ADD_LOG, payload: `[ADMIN] Balance adjusted by ${amount >= 0 ? '+' : ''}${amount.toFixed(2)} — ${adjNote || 'admin adjustment'}` });
+
+    if (adjTarget) {
+      // Also record in CRM if client matches
+      const client = crmClients.find(
+        (c) => c.name.toLowerCase().includes(adjTarget.toLowerCase()) ||
+               c.email.toLowerCase().includes(adjTarget.toLowerCase())
+      );
+      if (client) {
+        dispatch({
+          type: CRM_UPDATE_CLIENT,
+          payload: { id: client.id, balance: (client.balance || 0) + amount },
+        });
+      }
+    }
+    setAdjTarget(''); setAdjAmount(''); setAdjNote('');
+    flash(`Balance adjusted by ${amount >= 0 ? '+' : ''}${amount.toFixed(2)}.`);
+  };
+
+  // ── Symbol toggle ────────────────────────────────────────────────────────
+  const handleToggleSymbol = (sym) => {
+    setSymbols((prev) =>
+      prev.map((s) => s.symbol === sym ? { ...s, active: !s.active } : s)
+    );
+    dispatch({ type: ADD_LOG, payload: `[ADMIN] Symbol ${sym} toggled` });
+  };
+
+  const handleSpreadChange = (sym, value) => {
+    const spread = parseFloat(value);
+    if (isNaN(spread) || spread < 0) return;
+    setSymbols((prev) =>
+      prev.map((s) => s.symbol === sym ? { ...s, spread } : s)
+    );
+  };
+
+  const handleLevCapChange = (sym, value) => {
+    const cap = parseInt(value, 10);
+    if (isNaN(cap) || cap < 1) return;
+    setSymbols((prev) =>
+      prev.map((s) => s.symbol === sym ? { ...s, leverageCap: cap } : s)
+    );
+  };
+
+  // ── Save settings ─────────────────────────────────────────────────────────
+  const handleSaveSettings = () => {
+    dispatch({ type: ADD_LOG, payload: '[ADMIN] System settings saved' });
+    flash('Settings saved successfully.');
+  };
+
+  // ── Add demo CRM client ───────────────────────────────────────────────────
+  const handleAddDemoClient = () => {
+    const name = DEMO_CLIENT_NAMES[Math.floor(Math.random() * DEMO_CLIENT_NAMES.length)];
+    dispatch({
+      type: CRM_ADD_CLIENT,
+      payload: {
+        id:      `SA-${newId()}`,
+        name,
+        email:   `${name.split(' ')[0].toLowerCase()}@demo.trade`,
+        phone:   '+1-555-' + Math.floor(1000 + Math.random() * 9000),
+        country: 'US',
+        stage:   'lead',
+        balance: 0,
+        kyc:     'pending',
+        notes:   [],
+        transactions: [],
+        rep: 'admin',
+      },
+    });
+    flash(`Demo client "${name}" added to CRM.`);
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <div className="super-admin">
+      {/* Header */}
+      <div className="sa-header">
+        <span className="sa-title">👑 Super Admin Control Panel</span>
+        <span className="sa-subtitle">Platform Management · Full Access</span>
+        {msg && <span className="sa-flash">{msg}</span>}
+      </div>
+
+      {/* Tab nav */}
+      <div className="sa-tabs">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            className={`sa-tab${tab === t ? ' sa-tab-active' : ''}`}
+            onClick={() => setTab(t)}
+          >
+            {TAB_LABELS[t]}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Overview ─────────────────────────────────────────────────────── */}
+      {tab === 'overview' && (
+        <div className="sa-content">
+          <div className="sa-kpi-grid">
+            <KpiCard label="Open Positions"  value={totalOpenOrders}            color="#a0b0ff" />
+            <KpiCard label="Total Volume"    value={`${totalVolume.toFixed(2)} lots`} color="#50d0a0" />
+            <KpiCard label="Floating P&L"    value={formatProfit(totalPnL)}     color={totalPnL >= 0 ? '#50d0a0' : '#ff6060'} />
+            <KpiCard label="Active Brokers"  value={activeAccounts}             color="#a0b0ff" />
+            <KpiCard label="Suspended"       value={suspendedCount}             color={suspendedCount ? '#ff6060' : '#50d0a0'} />
+            <KpiCard label="Total Clients"   value={totalClients + crmClients.length} color="#e0c040" />
+            <KpiCard label="Demo Balance"    value={`$${account.balance.toFixed(2)}`} color="#50d0a0" />
+            <KpiCard label="Demo Equity"     value={`$${account.equity.toFixed(2)}`}  color="#a0b0ff" />
+          </div>
+
+          <div className="sa-section">
+            <div className="sa-section-title">Balance Adjustment</div>
+            <div className="sa-row">
+              <input
+                className="sa-input"
+                placeholder="Client name or email (optional)"
+                value={adjTarget}
+                onChange={(e) => setAdjTarget(e.target.value)}
+              />
+              <input
+                className="sa-input sa-input-sm"
+                type="number"
+                placeholder="Amount (+ / -)"
+                value={adjAmount}
+                onChange={(e) => setAdjAmount(e.target.value)}
+              />
+              <input
+                className="sa-input"
+                placeholder="Note / reason"
+                value={adjNote}
+                onChange={(e) => setAdjNote(e.target.value)}
+              />
+              <button className="sa-btn sa-btn-primary" onClick={handleAdjustBalance}>
+                Adjust
+              </button>
+            </div>
+          </div>
+
+          <div className="sa-section">
+            <div className="sa-section-title">Quick Actions</div>
+            <div className="sa-row">
+              <button className="sa-btn" onClick={handleAddDemoClient}>
+                + Add Demo Client
+              </button>
+              <button
+                className={`sa-btn ${settings.maintenanceMode ? 'sa-btn-danger' : ''}`}
+                onClick={() => {
+                  setSettings((s) => ({ ...s, maintenanceMode: !s.maintenanceMode }));
+                  flash(`Maintenance mode ${settings.maintenanceMode ? 'disabled' : 'enabled'}.`);
+                }}
+              >
+                {settings.maintenanceMode ? '🔴 Maintenance ON' : '🟢 Maintenance OFF'}
+              </button>
+              <button
+                className="sa-btn"
+                onClick={() => {
+                  setSettings((s) => ({ ...s, registrationOpen: !s.registrationOpen }));
+                  flash(`Registration ${settings.registrationOpen ? 'closed' : 'opened'}.`);
+                }}
+              >
+                {settings.registrationOpen ? '🔓 Registration Open' : '🔒 Registration Closed'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Accounts ─────────────────────────────────────────────────────── */}
+      {tab === 'accounts' && (
+        <div className="sa-content">
+          <div className="sa-section">
+            <div className="sa-section-title">Create Broker Account</div>
+            <div className="sa-row">
+              <input
+                className="sa-input"
+                placeholder="Broker / firm name"
+                value={newBroker.name}
+                onChange={(e) => setNewBroker((b) => ({ ...b, name: e.target.value }))}
+              />
+              <input
+                className="sa-input"
+                placeholder="Email address"
+                value={newBroker.email}
+                onChange={(e) => setNewBroker((b) => ({ ...b, email: e.target.value }))}
+              />
+              <select
+                className="sa-select"
+                value={newBroker.role}
+                onChange={(e) => setNewBroker((b) => ({ ...b, role: e.target.value }))}
+              >
+                <option value="broker">Broker</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+              <button className="sa-btn sa-btn-primary" onClick={handleCreateBroker}>
+                Create
+              </button>
+            </div>
+          </div>
+
+          <div className="sa-section">
+            <div className="sa-section-title">Broker Accounts</div>
+            <table className="sa-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Clients</th>
+                  <th>Balance</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {brokers.map((b) => (
+                  <tr key={b.id} className={b.status === 'suspended' ? 'sa-row-suspended' : ''}>
+                    <td className="sa-mono">{b.id}</td>
+                    <td>{b.name}</td>
+                    <td className="sa-dim">{b.email}</td>
+                    <td><span className={`sa-badge sa-role-${b.role}`}>{b.role}</span></td>
+                    <td className="sa-center">{b.clients}</td>
+                    <td className="sa-right">${b.balance.toLocaleString()}</td>
+                    <td>
+                      <span className={`sa-badge ${b.status === 'active' ? 'sa-status-active' : 'sa-status-suspended'}`}>
+                        {b.status}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className={`sa-btn sa-btn-sm ${b.status === 'active' ? 'sa-btn-warn' : 'sa-btn-ok'}`}
+                        onClick={() => handleToggleSuspend(b.id)}
+                      >
+                        {b.status === 'active' ? 'Suspend' : 'Reinstate'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Symbols ──────────────────────────────────────────────────────── */}
+      {tab === 'symbols' && (
+        <div className="sa-content">
+          <div className="sa-section">
+            <div className="sa-section-title">Symbol Configuration</div>
+            <table className="sa-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Spread (pts)</th>
+                  <th>Max Leverage</th>
+                  <th>Status</th>
+                  <th>Toggle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {symbols.map((s) => (
+                  <tr key={s.symbol} className={s.active ? '' : 'sa-row-suspended'}>
+                    <td className="sa-symbol">{s.symbol}</td>
+                    <td>
+                      <input
+                        className="sa-input sa-input-num"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={s.spread}
+                        onChange={(e) => handleSpreadChange(s.symbol, e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="sa-input sa-input-num"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={s.leverageCap}
+                        onChange={(e) => handleLevCapChange(s.symbol, e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <span className={`sa-badge ${s.active ? 'sa-status-active' : 'sa-status-suspended'}`}>
+                        {s.active ? 'Active' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className={`sa-btn sa-btn-sm ${s.active ? 'sa-btn-warn' : 'sa-btn-ok'}`}
+                        onClick={() => handleToggleSymbol(s.symbol)}
+                      >
+                        {s.active ? 'Disable' : 'Enable'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Trades ───────────────────────────────────────────────────────── */}
+      {tab === 'trades' && (
+        <div className="sa-content">
+          <div className="sa-section">
+            <div className="sa-section-title">
+              Open Positions ({orders.openOrders.length})
+            </div>
+            {orders.openOrders.length === 0 ? (
+              <div className="sa-empty">No open positions.</div>
+            ) : (
+              <table className="sa-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Lots</th>
+                    <th>Open Price</th>
+                    <th>SL</th>
+                    <th>TP</th>
+                    <th>Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.openOrders.map((o) => (
+                    <tr key={o.ticket}>
+                      <td className="sa-mono">{o.ticket}</td>
+                      <td className="sa-symbol">{o.symbol}</td>
+                      <td className={`sa-type-${o.type.toLowerCase()}`}>{o.type}</td>
+                      <td className="sa-center">{o.lots}</td>
+                      <td className="sa-right">{o.openPrice}</td>
+                      <td className="sa-right sa-dim">{o.sl || '—'}</td>
+                      <td className="sa-right sa-dim">{o.tp || '—'}</td>
+                      <td className={`sa-right ${(o.profit || 0) >= 0 ? 'sa-profit' : 'sa-loss'}`}>
+                        {formatProfit(o.profit || 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="sa-section">
+            <div className="sa-section-title">
+              Trade History ({closedOrders.length})
+            </div>
+            {closedOrders.length === 0 ? (
+              <div className="sa-empty">No closed trades yet.</div>
+            ) : (
+              <table className="sa-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Lots</th>
+                    <th>Open</th>
+                    <th>Close</th>
+                    <th>Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {closedOrders.map((o) => (
+                    <tr key={o.ticket}>
+                      <td className="sa-mono">{o.ticket}</td>
+                      <td className="sa-symbol">{o.symbol}</td>
+                      <td className={`sa-type-${o.type.toLowerCase()}`}>{o.type}</td>
+                      <td className="sa-center">{o.lots}</td>
+                      <td className="sa-right">{o.openPrice}</td>
+                      <td className="sa-right">{o.closePrice || '—'}</td>
+                      <td className={`sa-right ${(o.profit || 0) >= 0 ? 'sa-profit' : 'sa-loss'}`}>
+                        {formatProfit(o.profit || 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Settings ─────────────────────────────────────────────────────── */}
+      {tab === 'settings' && (
+        <div className="sa-content">
+          <div className="sa-section">
+            <div className="sa-section-title">Platform Settings</div>
+            <div className="sa-form-grid">
+              <label className="sa-label">Platform Name</label>
+              <input
+                className="sa-input"
+                value={settings.platformName}
+                onChange={(e) => setSettings((s) => ({ ...s, platformName: e.target.value }))}
+              />
+
+              <label className="sa-label">Support Email</label>
+              <input
+                className="sa-input"
+                value={settings.supportEmail}
+                onChange={(e) => setSettings((s) => ({ ...s, supportEmail: e.target.value }))}
+              />
+
+              <label className="sa-label">Default Currency</label>
+              <select
+                className="sa-select"
+                value={settings.defaultCurrency}
+                onChange={(e) => setSettings((s) => ({ ...s, defaultCurrency: e.target.value }))}
+              >
+                {['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'AUD'].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+
+              <label className="sa-label">Global Max Leverage</label>
+              <input
+                className="sa-input sa-input-sm"
+                type="number"
+                min="1"
+                max="2000"
+                value={settings.maxLeverage}
+                onChange={(e) => setSettings((s) => ({ ...s, maxLeverage: parseInt(e.target.value, 10) || 500 }))}
+              />
+
+              <label className="sa-label">Minimum Deposit ($)</label>
+              <input
+                className="sa-input sa-input-sm"
+                type="number"
+                min="0"
+                value={settings.minDeposit}
+                onChange={(e) => setSettings((s) => ({ ...s, minDeposit: parseInt(e.target.value, 10) || 0 }))}
+              />
+
+              <label className="sa-label">Maintenance Mode</label>
+              <div className="sa-toggle-row">
+                <button
+                  className={`sa-btn ${settings.maintenanceMode ? 'sa-btn-danger' : 'sa-btn-ok'}`}
+                  onClick={() => setSettings((s) => ({ ...s, maintenanceMode: !s.maintenanceMode }))}
+                >
+                  {settings.maintenanceMode ? '🔴 ON' : '🟢 OFF'}
+                </button>
+              </div>
+
+              <label className="sa-label">Open Registration</label>
+              <div className="sa-toggle-row">
+                <button
+                  className={`sa-btn ${settings.registrationOpen ? 'sa-btn-ok' : 'sa-btn-warn'}`}
+                  onClick={() => setSettings((s) => ({ ...s, registrationOpen: !s.registrationOpen }))}
+                >
+                  {settings.registrationOpen ? '🔓 Open' : '🔒 Closed'}
+                </button>
+              </div>
+            </div>
+
+            <div className="sa-row sa-mt">
+              <button className="sa-btn sa-btn-primary" onClick={handleSaveSettings}>
+                💾 Save Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── KPI Card sub-component ────────────────────────────────────────────────
+const KpiCard = ({ label, value, color }) => (
+  <div className="sa-kpi-card">
+    <div className="sa-kpi-value" style={{ color }}>{value}</div>
+    <div className="sa-kpi-label">{label}</div>
+  </div>
+);
+
+export default SuperAdmin;
+
+```
+
+---
+
+## Source Code — Additional Tests
+
+## src/__tests__/trading.test.js
+
+```js
+import { calculateMargin, calculateProfit } from '../utils/constants';
+
+describe('calculateMargin', () => {
+  it('calculates correct margin for EURUSD (quote-USD pair)', () => {
+    // 0.1 lot EURUSD @ 1.0850, leverage 100
+    // margin = 1.0850 * 0.1 * 100000 / 100 = $108.50
+    const margin = calculateMargin('EURUSD', 0.1, 1.085, 100);
+    expect(margin).toBeCloseTo(108.5, 1);
+  });
+
+  it('calculates correct margin for USDJPY (USD-base pair)', () => {
+    // 0.1 lot USDJPY @ 149.50, leverage 100
+    // margin = 0.1 * 100000 / 100 = $100 (not affected by JPY rate)
+    const margin = calculateMargin('USDJPY', 0.1, 149.5, 100);
+    expect(margin).toBeCloseTo(100, 1);
+  });
+
+  it('calculates correct margin for XAUUSD (gold, 100 oz per lot)', () => {
+    // 0.1 lot XAUUSD @ 2020, leverage 100
+    // margin = 2020 * 0.1 * 100 / 100 = $202
+    const margin = calculateMargin('XAUUSD', 0.1, 2020, 100);
+    expect(margin).toBeCloseTo(202, 1);
+  });
+
+  it('calculates correct margin for BTCUSD (crypto, 1 unit per lot)', () => {
+    // 0.1 lot BTCUSD @ 52000, leverage 100
+    // margin = 52000 * 0.1 * 1 / 100 = $52
+    const margin = calculateMargin('BTCUSD', 0.1, 52000, 100);
+    expect(margin).toBeCloseTo(52, 1);
+  });
+
+  it('uses leverage=100 as default when not provided', () => {
+    const m1 = calculateMargin('EURUSD', 0.1, 1.085, 100);
+    const m2 = calculateMargin('EURUSD', 0.1, 1.085, undefined);
+    expect(m1).toBe(m2);
+  });
+});
+
+describe('calculateProfit', () => {
+  it('calculates correct profit for BUY EURUSD (quote-USD)', () => {
+    // 0.1 lot BUY EURUSD, open 1.0850, close 1.0860 → 10 pips
+    // profit = (1.0860 - 1.0850) * 0.1 * 100000 = $10
+    const profit = calculateProfit('EURUSD', 'BUY', 1.085, 1.086, 0.1);
+    expect(profit).toBeCloseTo(10, 0);
+  });
+
+  it('calculates correct profit for SELL EURUSD (quote-USD)', () => {
+    // 0.1 lot SELL EURUSD, open 1.0860, close 1.0850 → 10 pips profit
+    const profit = calculateProfit('EURUSD', 'SELL', 1.086, 1.085, 0.1);
+    expect(profit).toBeCloseTo(10, 0);
+  });
+
+  it('calculates negative profit for losing trade', () => {
+    // 0.1 lot BUY EURUSD, price goes down 10 pips
+    const profit = calculateProfit('EURUSD', 'BUY', 1.086, 1.085, 0.1);
+    expect(profit).toBeCloseTo(-10, 0);
+  });
+
+  it('calculates correct profit for USDJPY (USD-base pair)', () => {
+    // 0.1 lot BUY USDJPY, open 149.50, close 149.60 (10 pips)
+    // profit in JPY = (149.60 - 149.50) * 0.1 * 100000 = 1000 JPY
+    // profit in USD = 1000 / 149.60 ≈ $6.68
+    const profit = calculateProfit('USDJPY', 'BUY', 149.5, 149.6, 0.1);
+    expect(profit).toBeGreaterThan(0);
+    expect(profit).toBeCloseTo(6.68, 0);
+  });
+
+  it('calculates correct profit for XAUUSD (gold)', () => {
+    // 0.1 lot BUY XAU, open 2020, close 2030 → $10 move
+    // profit = 10 * 0.1 * 100 = $100
+    const profit = calculateProfit('XAUUSD', 'BUY', 2020, 2030, 0.1);
+    expect(profit).toBeCloseTo(100, 0);
+  });
+
+  it('calculates correct profit for BTCUSD (crypto)', () => {
+    // 0.1 lot BUY BTC, open 52000, close 52100 → $100 move
+    // profit = 100 * 0.1 * 1 = $10
+    const profit = calculateProfit('BTCUSD', 'BUY', 52000, 52100, 0.1);
+    expect(profit).toBeCloseTo(10, 0);
+  });
+
+  it('returns zero profit when open and close price are equal', () => {
+    const profit = calculateProfit('EURUSD', 'BUY', 1.085, 1.085, 0.1);
+    expect(profit).toBe(0);
+  });
+});
+
 ```
 
 ---
