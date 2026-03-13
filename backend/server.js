@@ -81,4 +81,5 @@ httpServer.listen(config.port, () => {
   console.log(`  Demo:  demo@vda.trade   / Demo1234!   (trader)`);
 });
 
-module.exports = app; // exported for testing
+module.exports = app;          // exported for testing
+module.exports.httpServer = httpServer; // allow tests to close the server
