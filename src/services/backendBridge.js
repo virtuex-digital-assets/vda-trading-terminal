@@ -240,6 +240,17 @@ class BackendBridge {
     return h;
   }
 
+  async _request(method, path, body) {
+    const options = { method, headers: this._headers() };
+    if (body !== undefined) options.body = JSON.stringify(body);
+    const res = await fetch(`${API_BASE}${path}`, options);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }));
+      throw new Error(err.error || `Request failed: ${res.status}`);
+    }
+    return res.json();
+  }
+
   _openWs() {
     const url = this._token ? `${WS_URL}?token=${encodeURIComponent(this._token)}` : WS_URL;
     let ws;

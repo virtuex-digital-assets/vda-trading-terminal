@@ -287,12 +287,7 @@ class MT4Bridge {
       case 'candle':
         store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data));
         break;
-      case 'account':
-        store.dispatch(updateAccount(msg.data));
-        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data || msg.candle));
-        break;
       case 'account': {
-        // eslint-disable-next-line no-unused-vars
         const { type: _t, ...accountData } = msg;
         store.dispatch(updateAccount(accountData));
         break;
@@ -307,6 +302,20 @@ class MT4Bridge {
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));
+    }
+  }
+  _handleOrderMessage(msg) {
+    if (msg.action === 'open') {
+      store.dispatch(placeOrder(msg.order || msg));
+    } else if (msg.action === 'close') {
+      const ticket = (msg.order || msg).ticket;
+      store.dispatch(closeOrder(ticket));
+      store.dispatch(addHistoryOrder(msg.order || msg));
+    } else if (msg.action === 'modify') {
+      const order = msg.order || msg;
+      store.dispatch(modifyOrder(order.ticket, order.sl, order.tp));
+    } else {
+      store.dispatch(addLog('debug', `Unknown order action: ${msg.action}`));
     }
   }
 }

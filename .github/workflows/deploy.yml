@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  pages: write
 
 concurrency:
   group: pages
@@ -35,6 +36,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build
+          enable_jekyll: false
+
       - name: Configure GitHub Pages source
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -50,10 +58,3 @@ jobs:
             -f "source[path]=/" \
             2>/dev/null \
           || echo "Pages source already configured."
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
-          enable_jekyll: false
