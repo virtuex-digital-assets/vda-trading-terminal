@@ -35,9 +35,36 @@ class BackendBridge {
       headers: this._headers(),
       body:    body ? JSON.stringify(body) : undefined,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    return data;
+
+    const contentType = res.headers.get('content-type') || '';
+    const text = await res.text();
+
+    let data = null;
+    if (text && contentType.includes('application/json')) {
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // If JSON parsing fails, fall back to treating the body as plain text.
+        data = null;
+      }
+    }
+
+    if (!res.ok) {
+      const message =
+        (data && (data.error || data.message)) ||
+        text ||
+        `HTTP ${res.status}`;
+      const error = new Error(message);
+      error.status = res.status;
+      error.responseText = text;
+      throw error;
+    }
+
+    // On success, return parsed JSON when available; otherwise, return
+    // raw text (if any) or undefined for empty bodies (e.g. 204).
+    if (data !== null) return data;
+    if (text) return text;
+    return undefined;
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────
