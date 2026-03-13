@@ -45,9 +45,51 @@ function updateSymbol(req, res) {
 
   const allowed = ['description', 'spread', 'leverageCap', 'contractSize',
                    'pipSize', 'digits', 'tradingHours', 'active'];
+  const numericFields = new Set([
+    'spread',
+    'leverageCap',
+    'contractSize',
+    'pipSize',
+    'digits',
+  ]);
+  const booleanFields = new Set(['active']);
+
+  const updates = {};
+
   allowed.forEach((field) => {
-    if (req.body[field] !== undefined) cfg[field] = req.body[field];
+    if (req.body[field] === undefined) return;
+
+    const raw = req.body[field];
+
+    if (numericFields.has(field)) {
+      const num = typeof raw === 'number' ? raw : Number(raw);
+      if (!Number.isFinite(num)) {
+        return res.status(400).json({ error: `Invalid numeric value for ${field}` });
+      }
+      updates[field] = num;
+    } else if (booleanFields.has(field)) {
+      let boolVal;
+      if (typeof raw === 'boolean') {
+        boolVal = raw;
+      } else if (typeof raw === 'string') {
+        const lowered = raw.toLowerCase().trim();
+        if (lowered === 'true') {
+          boolVal = true;
+        } else if (lowered === 'false') {
+          boolVal = false;
+        } else {
+          return res.status(400).json({ error: `Invalid boolean value for ${field}` });
+        }
+      } else {
+        return res.status(400).json({ error: `Invalid boolean value for ${field}` });
+      }
+      updates[field] = boolVal;
+    } else {
+      updates[field] = raw;
+    }
   });
+
+  Object.assign(cfg, updates);
 
   res.json(cfg);
 }
