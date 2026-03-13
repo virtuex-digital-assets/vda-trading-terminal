@@ -8,6 +8,10 @@ import {
   UPDATE_ACCOUNT,
   ADD_LOG,
 } from '../../store/actions/actionTypes';
+import CRMView from '../CRM/CRMView';
+import BrokerMonitor from '../BrokerMonitor/BrokerMonitor';
+import MarketFeed from '../MarketFeed/MarketFeed';
+import Terminal from '../Terminal/Terminal';
 import backendBridge from '../../services/backendBridge';
 import './SuperAdmin.css';
 
@@ -16,6 +20,10 @@ import './SuperAdmin.css';
  *
  * Provides privileged operations beyond the broker dashboard:
  *  • Global platform statistics
+ *  • CRM – full client relationship management
+ *  • Risk Monitor – broker exposure & margin risk
+ *  • Market Feed – live trading signals
+ *  • Terminal Log – system event log
  *  • User / broker account management (create, suspend, adjust balance)
  *  • Symbol configuration (spread, leverage cap)
  *  • Trade history review
@@ -38,9 +46,14 @@ const DEFAULT_SYMBOLS = [
   { symbol: 'BTCUSD',  spread: 50,  leverageCap: 10,  active: false },
 ];
 
+const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'settings'];
 const TABS = ['overview', 'accounts', 'symbols', 'trades', 'audit', 'settings'];
 const TAB_LABELS = {
   overview: '📊 Overview',
+  crm:      '👥 CRM',
+  risk:     '🛡 Risk Monitor',
+  feed:     '🎬 Market Feed',
+  terminal: '🖥 Terminal Log',
   accounts: '👤 Accounts',
   symbols:  '📈 Symbols',
   trades:   '📋 Trades',
@@ -615,46 +628,31 @@ const SuperAdmin = () => {
         </div>
       )}
 
-      {/* ── Audit Log ────────────────────────────────────────────────────── */}
-      {tab === 'audit' && (
-        <div className="sa-content">
-          <div className="sa-section">
-            <div className="sa-section-title">Audit Log
-              <span className="sa-dim sa-ml">({auditLog.length} recent entries)</span>
-            </div>
-            {auditLog.length === 0 ? (
-              <div className="sa-empty">
-                {backendBridge.isConfigured()
-                  ? 'No audit entries yet.'
-                  : 'Audit log requires backend API (set REACT_APP_API_URL).'}
-              </div>
-            ) : (
-              <table className="sa-table sa-audit-table">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Method</th>
-                    <th>Path</th>
-                    <th>User</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLog.map((e, i) => (
-                    <tr key={i} className={e.status >= 400 ? 'sa-row-error' : ''}>
-                      <td className="sa-mono sa-dim">{new Date(e.ts).toLocaleTimeString()}</td>
-                      <td className={`sa-method sa-method-${e.method.toLowerCase()}`}>{e.method}</td>
-                      <td className="sa-mono">{e.path}</td>
-                      <td className="sa-dim">{e.userEmail || '—'}</td>
-                      <td className="sa-dim">{e.role || '—'}</td>
-                      <td className={e.status >= 400 ? 'sa-loss' : 'sa-profit'}>{e.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+      {/* ── CRM ──────────────────────────────────────────────────────────── */}
+      {tab === 'crm' && (
+        <div className="sa-embed-view">
+          <CRMView />
+        </div>
+      )}
+
+      {/* ── Risk Monitor ─────────────────────────────────────────────────── */}
+      {tab === 'risk' && (
+        <div className="sa-embed-view">
+          <BrokerMonitor />
+        </div>
+      )}
+
+      {/* ── Market Feed ──────────────────────────────────────────────────── */}
+      {tab === 'feed' && (
+        <div className="sa-embed-view">
+          <MarketFeed />
+        </div>
+      )}
+
+      {/* ── Terminal Log ─────────────────────────────────────────────────── */}
+      {tab === 'terminal' && (
+        <div className="sa-embed-view">
+          <Terminal />
         </div>
       )}
 

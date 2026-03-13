@@ -293,6 +293,19 @@
   font-style: italic;
 }
 
+/* ── Embedded sub-view wrapper ──────────────────────────────────────────────── */
+.sa-embed-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sa-embed-view > * {
+  flex: 1;
+  min-height: 0;
+}
 /* Audit log */
 .sa-audit-table { font-size: 11px; }
 .sa-ml { margin-left: 8px; }
