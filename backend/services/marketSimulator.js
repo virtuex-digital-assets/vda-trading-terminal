@@ -69,7 +69,17 @@ function barTime(ts, tfSeconds) {
   return Math.floor(ts / tfSeconds) * tfSeconds;
 }
 
+/**
+ * Get the current spread for a symbol.
+ * Uses the symbol registry if available, falls back to hardcoded SPREADS.
+ */
 function getSpread(symbol) {
+  // Lazy-require to avoid circular dependency at module load time
+  try {
+    const db = require('../models');
+    const cfg = db.symbolRegistry && db.symbolRegistry.get(symbol);
+    if (cfg && cfg.spread !== undefined) return cfg.spread;
+  } catch (_) { /* ignore */ }
   return SPREADS[symbol] || 0.0001;
 }
 

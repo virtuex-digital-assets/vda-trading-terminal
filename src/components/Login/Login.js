@@ -71,9 +71,9 @@ const Login = ({ onLogin }) => {
   };
 
   const fillDemo = (role) => {
-    if (role === 'super_admin') { setEmail('superadmin@vda.trade'); setPassword('SuperAdmin1!'); }
-    else if (role === 'admin')  { setEmail('admin@vda.trade');      setPassword('Admin1234!'); }
-    else                        { setEmail('demo@vda.trade');        setPassword('Demo1234!'); }
+    if (role === 'super_admin') { setEmail('super@vda.trade');  setPassword('Super1234!'); }
+    else if (role === 'admin')  { setEmail('admin@vda.trade');  setPassword('Admin1234!'); }
+    else                        { setEmail('demo@vda.trade');   setPassword('Demo1234!'); }
   };
 
   return (
