@@ -71,7 +71,6 @@ const AppInner = () => {
       if (user.role === 'super_admin') setAppMode('superadmin');
       else if (user.role === 'admin')  setAppMode('broker');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogin = async (role, token) => {
