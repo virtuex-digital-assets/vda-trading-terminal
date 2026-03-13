@@ -38,11 +38,31 @@ function auditLog(req, res, next) {
   next();
 }
 
-/** Strip sensitive fields before storing. */
+/** Strip sensitive fields before storing (recursively). */
+const SENSITIVE_KEYS = new Set(['password', 'passwordHash', 'token']);
+
+function redactValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(redactValue);
+  }
+
+  if (value && typeof value === 'object') {
+    const result = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (SENSITIVE_KEYS.has(key)) {
+        continue;
+      }
+      result[key] = redactValue(val);
+    }
+    return result;
+  }
+
+  return value;
+}
+
 function sanitise(body) {
   if (!body || typeof body !== 'object') return body;
-  const { password, passwordHash, token, ...safe } = body; // eslint-disable-line no-unused-vars
-  return safe;
+  return redactValue(body);
 }
 
 module.exports = { auditLog };
