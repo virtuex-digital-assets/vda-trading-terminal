@@ -1,64 +1,26 @@
 {
   "name": "vda-trading-terminal",
   "version": "1.0.0",
-  "description": "A React-based trading terminal application with real-time market data, virtual wallet, and trading features.",
-  "main": "index.js",
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "start": "NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
   "description": "VDA MetaTrader 4 trading terminal – React frontend with Redux state management, candlestick charts, order management, and MT4 bridge connectivity.",
   "homepage": "https://virtuex-digital-assets.github.io/vda-trading-terminal",
   "private": true,
   "scripts": {
-    "start": "react-scripts start",
+    "start": "NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
     "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
   "dependencies": {
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
-    "react-scripts": "^4.0.3",
-    "axios": "^1.13.6",
-    "axios": "^1.13.5",
     "axios": "^1.13.6",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-redux": "^7.2.4",
-    "react-scripts": "^4.0.3",
+    "react-scripts": "4.0.3",
     "redux": "^4.1.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.14.1",
-    "@testing-library/react": "^11.2.7"
-  },
-  "homepage": "https://yourhomepage.com",
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
-    "react-scripts": "4.0.3",
-    "redux": "^4.1.0",
-    "react-redux": "^7.2.4"
-  },
-  "devDependencies": {
     "@testing-library/react": "^11.2.7",
-    "@testing-library/jest-dom": "^5.14.1"
-  },
-  "homepage": "https://github.com/virtuex-digital-assets/vda-trading-terminal"
-}
-  "homepage": "https://www.virtuexdigitalasset.com/"
-    "@testing-library/jest-dom": "^5.14.1",
     "@testing-library/user-event": "^12.8.3"
   },
   "browserslist": {

@@ -22,7 +22,6 @@ import {
   setOrders,
   addHistoryOrder,
   cancelPendingOrder,
-  addHistoryOrder,
   setConnectionStatus,
   addLog,
 } from '../store/actions';
