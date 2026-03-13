@@ -11,6 +11,15 @@ const initialState = {
 const ordersReducer = (state = initialState, action) => {
   switch (action.type) {
     case PLACE_ORDER: {
+      // Use server-assigned ticket when available (backend mode), otherwise
+      // generate a client-side ticket for simulator mode.
+      const ticket = action.payload.ticket ?? ++ticketCounter;
+      const order = {
+        ...action.payload,
+        ticket,
+        openTime: action.payload.openTime ?? new Date().toISOString(),
+        profit: action.payload.profit ?? 0,
+      };
       // Use server-assigned ticket when available (backend mode), otherwise auto-generate
       const ticket = action.payload.ticket != null ? action.payload.ticket : ++ticketCounter;
       const order = {
@@ -70,6 +79,17 @@ const ordersReducer = (state = initialState, action) => {
       };
     }
 
+    // ── Backend sync ──────────────────────────────────────────────────────
+
+    case SET_ORDERS: {
+      // Replace entire orders state with data from the backend.
+      const { open = [], pending = [], history = [] } = action.payload;
+      return { ...state, openOrders: open, pendingOrders: pending, history };
+    }
+
+    case ADD_HISTORY_ORDER: {
+      // Prepend a single closed order returned by the REST close endpoint.
+      return { ...state, history: [action.payload, ...state.history] };
     case SET_ORDERS: {
       // Replace order lists loaded from the backend (undefined keys are left unchanged)
       return {

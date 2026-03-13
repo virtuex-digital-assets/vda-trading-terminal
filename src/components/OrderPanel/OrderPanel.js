@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
+import backendBridge from '../../services/backendBridge';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
 import backendBridge from '../../services/backendBridge';
@@ -64,6 +65,11 @@ const OrderPanel = () => {
     };
 
     if (backendBridge.isConfigured()) {
+      // Live backend: REST API creates the order and assigns a server ticket.
+      backendBridge.placeOrder(order);
+    } else {
+      dispatch(placeOrder(order));
+      // Note: account margin is recalculated automatically on each simulator tick
       try {
         await backendBridge.placeOrder(order);
       } catch (err) {

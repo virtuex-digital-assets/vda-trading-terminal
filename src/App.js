@@ -54,6 +54,11 @@ const AppInner = () => {
 
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin') setAppMode('broker');
+    // When connected to the live backend, load account state and orders.
+    if (backendBridge.isConfigured()) {
+      backendBridge.loadAccount();
+      backendBridge.loadOrders();
+    }
   };
 
   const handleLogout = () => {

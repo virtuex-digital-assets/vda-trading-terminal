@@ -107,6 +107,17 @@ export const cancelPendingOrder = (ticket) => ({
 });
 
 /**
+ * Bulk-replace the orders state from the backend (used on login / reconnect).
+ * @param {{ open: object[], pending: object[], history: object[] }} orders
+ */
+export const setOrders = (orders) => ({
+  type: SET_ORDERS,
+  payload: orders,
+});
+
+/**
+ * Prepend a single closed order to trade history (used after REST close).
+ * @param {object} order
  * Replace all orders in the store with data loaded from the backend.
  * @param {object[]} [open]     Open market orders
  * @param {object[]} [pending]  Pending limit/stop orders

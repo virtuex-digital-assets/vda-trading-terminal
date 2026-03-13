@@ -123,8 +123,10 @@ function tick() {
   // Recalculate every account
   db.accounts.forEach((account) => {
     recalculateAccount(account.id);
+    // eslint-disable-next-line no-unused-vars
+    const { userId, ...safeAccount } = account;
     broadcast(
-      { type: 'account', ...account },
+      { type: 'account', ...safeAccount },
       (client) => client._accountId === account.id
     );
   });
@@ -173,8 +175,10 @@ function startWsServer(httpServer) {
           const account = getAccountByUserId(user.id);
           if (account) {
             ws._accountId = account.id;
+            // eslint-disable-next-line no-unused-vars
+            const { userId, ...safeAccount } = account;
             // Send current state to the newly authenticated client
-            send(ws, { type: 'account', ...account });
+            send(ws, { type: 'account', ...safeAccount });
           }
           send(ws, { type: 'auth_ok', role: user.role, name: user.name });
 
