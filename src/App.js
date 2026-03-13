@@ -20,16 +20,15 @@ import './components/shared.css';
 import './App.css';
 
 const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
-
-const API_URL = process.env.REACT_APP_API_URL || '';
+const API_URL        = process.env.REACT_APP_API_URL        || '';
 
 const AppInner = () => {
   // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin'
-  const [appMode,    setAppMode]    = useState('terminal');
-  const [userRole,   setUserRole]   = useState(null);   // null = not logged in
-  const [showLogin,  setShowLogin]  = useState(false);
+  const [appMode,   setAppMode]   = useState('terminal');
+  const [userRole,  setUserRole]  = useState(null);   // null = not logged in
+  const [showLogin, setShowLogin] = useState(false);
 
-  // ── MT4 bridge ────────────────────────────────────────────────────────
+  // ── Market data bridge ─────────────────────────────────────────────────
   useEffect(() => {
     // Use the backend bridge for real-time data when the API is configured,
     // otherwise fall back to the built-in MT4 simulator.
@@ -39,11 +38,23 @@ const AppInner = () => {
       } else {
         mt4Bridge.startSimulator();
       }
+    if (backendBridge.isConfigured()) {
+      // Connect to backend WebSocket (market data + real-time updates).
+      // The simulator is NOT started when a live backend is configured.
+      backendBridge.connect();
+      return () => backendBridge.disconnect();
+    }
+    // Standalone / demo mode – use the built-in market simulator.
+    if (MT4_BRIDGE_URL) {
+      mt4Bridge.connect(MT4_BRIDGE_URL);
+    } else {
+      mt4Bridge.startSimulator();
     }
     return () => mt4Bridge.disconnect();
   }, []);
 
   // ── Auto-login from stored JWT ────────────────────────────────────────
+  // ── Auto-login from stored JWT ─────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('vda_token');
     const user  = (() => {
@@ -65,7 +76,6 @@ const AppInner = () => {
           else if (data.user.role === 'admin')  setAppMode('broker');
         })
         .catch(() => {
-          // Token is invalid / expired – clear storage
           localStorage.removeItem('vda_token');
           localStorage.removeItem('vda_user');
         });
@@ -75,22 +85,48 @@ const AppInner = () => {
       if (user.role === 'super_admin') setAppMode('superadmin');
       else if (user.role === 'admin')  setAppMode('broker');
     }
+  // eslint-disable-next-line
   }, []);
 
   const handleLogin = async (role, token) => {
     setUserRole(role);
     setShowLogin(false);
 
-    // When a real backend token is available, initialise the bridge.
+    if (role === 'super_admin') setAppMode('superadmin');
+    else if (role === 'admin')  setAppMode('broker');
+
+    if (role === 'super_admin') setAppMode('superadmin');
+    else if (role === 'admin')  setAppMode('broker');
+
     if (token && backendBridge.isConfigured()) {
       backendBridge.setToken(token);
-      // Stop the local simulator if it was running
       mt4Bridge.stopSimulator();
-      await backendBridge.initialize();
-    }
 
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin') setAppMode('broker');
+      // Load initial account state from REST
+      try {
+        const account = await backendBridge.loadAccount();
+        store.dispatch(updateAccount(account));
+      } catch (err) {
+        store.dispatch(addLog('warn', `Could not load account: ${err.message}`));
+      }
+
+      // Load open/pending orders and history from REST
+      try {
+        const [ordersData, history] = await Promise.all([
+          backendBridge.loadOrders(),
+          backendBridge.loadHistory(),
+        ]);
+        store.dispatch(setOrders(
+          ordersData.open    || [],
+          ordersData.pending || [],
+          history            || [],
+        ));
+      } catch (err) {
+        store.dispatch(addLog('warn', `Could not load orders: ${err.message}`));
+      }
+    }
   };
 
   const handleLogout = () => {
@@ -116,10 +152,10 @@ const AppInner = () => {
 
   return (
     <div className="terminal-root">
-      {/* ── Login overlay ───────────────────────────────────────────── */}
+      {/* ── Login overlay ─────────────────────────────────────────────── */}
       {showLogin && <Login onLogin={handleLogin} />}
 
-      {/* ── Top bar ──────────────────────────────────────────────────── */}
+      {/* ── Top bar ───────────────────────────────────────────────────── */}
       <header className="top-bar">
         <span className="logo">VDA</span>
         <span className="logo-sub">{modeLabel[appMode] || modeLabel.terminal}</span>
@@ -184,27 +220,27 @@ const AppInner = () => {
         </div>
       </header>
 
-      {/* ── CRM view ─────────────────────────────────────────────────── */}
+      {/* ── CRM view ──────────────────────────────────────────────────── */}
       {appMode === 'crm' && <CRMView />}
 
-      {/* ── Market Feed ──────────────────────────────────────────────── */}
+      {/* ── Market Feed ───────────────────────────────────────────────── */}
       {appMode === 'feed' && <MarketFeed />}
 
-      {/* ── Broker risk monitor ──────────────────────────────────────── */}
+      {/* ── Broker risk monitor ───────────────────────────────────────── */}
       {appMode === 'broker' && (
         <div className="broker-view">
           <BrokerMonitor />
         </div>
       )}
 
-      {/* ── Super Admin panel ─────────────────────────────────────────── */}
+      {/* ── Super Admin panel ─────────────────────────────────────── */}
       {appMode === 'superadmin' && (
         <div className="broker-view">
           <SuperAdmin />
         </div>
       )}
 
-      {/* ── Trading terminal layout ───────────────────────────────────── */}
+      {/* ── Trading terminal layout ────────────────────────────────────── */}
       {appMode === 'terminal' && (
         <div className="main-layout">
           {/* Left sidebar: Market Watch + Account */}

@@ -13,7 +13,11 @@ const request = require('supertest');
 const app     = require('../server');
 
 afterAll((done) => {
-  app.httpServer.close(done);
+  if (app.httpServer && app.httpServer.listening) {
+    app.httpServer.close(done);
+  } else {
+    done();
+  }
 });
 
 

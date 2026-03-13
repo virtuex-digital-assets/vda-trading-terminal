@@ -3,7 +3,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
-import backendBridge from '../../services/backendBridge';
 import './OrderPanel.css';
 
 const ORDER_TYPES = ['BUY', 'SELL', 'BUY LIMIT', 'SELL LIMIT', 'BUY STOP', 'SELL STOP'];
@@ -78,9 +77,35 @@ const OrderPanel = () => {
           `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
         )
       );
+      // ── Live backend mode ───────────────────────────────────────────────
+      setSubmitError('');
+      setSubmitting(true);
+      try {
+        const placed = await backendBridge.placeOrder(order);
+        // Dispatch with server-assigned ticket so UI reflects backend state
+        dispatch(placeOrder(placed));
+        dispatch(
+          addLog(
+            'info',
+            `Order placed: ${placed.type} ${placed.lots} ${placed.symbol} @ ${formatPrice(placed.symbol, placed.openPrice)} #${placed.ticket}`
+          )
+        );
+        setPrice('');
+        setComment('');
+      } catch (err) {
+        const msg = `Order rejected: ${err.message}`;
+        setSubmitError(msg);
+        dispatch(addLog('error', msg));
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // ── Demo / simulator mode ────────────────────────────────────────────
+      dispatch(placeOrder(order));
+      dispatch(addLog('info', `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`));
+      setPrice('');
+      setComment('');
     }
-    setPrice('');
-    setComment('');
   };
 
   return (

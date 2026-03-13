@@ -76,6 +76,44 @@ export const updateOrderProfit = (ticket, profit) => ({
   payload: { ticket, profit },
 });
 
+export const cancelPendingOrder = (ticket) => ({
+  type: CANCEL_PENDING_ORDER,
+  payload: ticket,
+});
+
+/**
+ * Replace all orders in the store with data loaded from the backend.
+ * @param {object[]} [open]     Open market orders
+ * @param {object[]} [pending]  Pending limit/stop orders
+ * @param {object[]} [history]  Closed trade history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: {
+    ...(open    !== undefined && { open }),
+    ...(pending !== undefined && { pending }),
+    ...(history !== undefined && { history }),
+  },
+ * Replace the entire orders state with data loaded from the backend.
+ * @param {object[]} open     - open market orders
+ * @param {object[]} pending  - pending limit/stop orders
+ * @param {object[]} history  - closed order history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: { open, pending, history },
+});
+
+/**
+ * Add a single closed order to history (e.g. from a backend WebSocket event).
+ * Deduplicates by ticket number.
+ * @param {object} order  Closed order object from the backend
+ */
+export const addHistoryOrder = (order) => ({
+  type: ADD_HISTORY_ORDER,
+  payload: order,
+});
+
 // ── Account actions ────────────────────────────────────────────────────────
 export const updateAccount = (accountData) => ({
   type: UPDATE_ACCOUNT,
@@ -101,37 +139,7 @@ export const addLog = (level, message) => ({
 
 export const clearLog = () => ({ type: CLEAR_LOG });
 
-export const cancelPendingOrder = (ticket) => ({
-  type: CANCEL_PENDING_ORDER,
-  payload: ticket,
-});
-
-/**
- * Replace all orders in the store with data loaded from the backend.
- * @param {object[]} [open]     Open market orders
- * @param {object[]} [pending]  Pending limit/stop orders
- * @param {object[]} [history]  Closed trade history
- */
-export const setOrders = (open, pending, history) => ({
-  type: SET_ORDERS,
-  payload: {
-    ...(open    !== undefined && { open }),
-    ...(pending !== undefined && { pending }),
-    ...(history !== undefined && { history }),
-  },
-});
-
-/**
- * Prepend a single closed order to the history array (deduplicates by ticket).
- * @param {object} order  Closed order object from the backend
- */
-export const addHistoryOrder = (order) => ({
-  type: ADD_HISTORY_ORDER,
-  payload: order,
-});
-
 // ── CRM actions ────────────────────────────────────────────────────────────
-
 export const crmSetView = (view) => ({ type: CRM_SET_VIEW, payload: view });
 export const crmSelectClient = (id) => ({ type: CRM_SELECT_CLIENT, payload: id });
 export const crmAddClient = (data) => ({ type: CRM_ADD_CLIENT, payload: data });

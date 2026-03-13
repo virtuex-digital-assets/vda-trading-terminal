@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { closeOrder, modifyOrder, addLog, updateAccount } from '../../store/actions';
-import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
+import { closeOrder, modifyOrder, cancelPendingOrder, addLog, updateAccount, addHistoryOrder } from '../../store/actions';
 import backendBridge from '../../services/backendBridge';
+import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
 import './Positions.css';
 
 const TABS = ['Positions', 'Orders', 'History'];
@@ -109,6 +110,57 @@ const Positions = () => {
     dispatch(
       addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(profit)}`)
     );
+    const q = quotes[symbol] || {};
+    const closePrice = type === 'BUY' ? q.bid : q.ask;
+    const order = openOrders.find((o) => o.ticket === ticket);
+    const profit = order?.profit ?? 0;
+
+    setCloseError('');
+    setClosingTicket(ticket);
+
+    if (backendBridge.isConfigured()) {
+      try {
+        const closed = await backendBridge.closeOrder(ticket);
+        dispatch(closeOrder(ticket));
+        if (closed.balance != null) {
+          dispatch(updateAccount({ balance: closed.balance }));
+        } else {
+          dispatch(updateAccount({ balance: parseFloat((balance + profit).toFixed(2)) }));
+        }
+        dispatch(
+          addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(closed.profit || profit)}`)
+        );
+      } catch (err) {
+        const msg = `Failed to close #${ticket}: ${err.message}`;
+        setCloseError(msg);
+        dispatch(addLog('error', msg));
+      } finally {
+        setClosingTicket(null);
+      }
+    } else {
+      const newBalance = parseFloat((balance + profit).toFixed(2));
+      dispatch(closeOrder(ticket));
+      dispatch(updateAccount({ balance: newBalance }));
+      dispatch(
+        addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(profit)}`)
+      );
+      setClosingTicket(null);
+    }
+  };
+
+  const handleCancelPending = async (ticket) => {
+    if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.closeOrder(ticket);
+        dispatch(cancelPendingOrder(ticket));
+        dispatch(addLog('info', `Cancelled pending order #${ticket}`));
+      } catch (err) {
+        dispatch(addLog('error', `Failed to cancel #${ticket}: ${err.message}`));
+      }
+      return;
+    }
+    dispatch(cancelPendingOrder(ticket));
+    dispatch(addLog('info', `Cancelled pending order #${ticket}`));
   };
 
   const handleModifySave = async (ticket, sl, tp) => {
@@ -122,6 +174,20 @@ const Positions = () => {
     }
     dispatch(modifyOrder(ticket, sl, tp));
     dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+        dispatch(modifyOrder(ticket, sl, tp));
+        dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+        return true;
+      } catch (err) {
+        const msg = `Failed to modify #${ticket}: ${err.message}`;
+        setModifyError(msg);
+        dispatch(addLog('error', msg));
+        return false;
+      }
+    } else {
+      dispatch(modifyOrder(ticket, sl, tp));
+      dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
+      return true;
+    }
   };
 
   const totalProfit = openOrders.reduce((sum, o) => sum + (o.profit || 0), 0);

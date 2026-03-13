@@ -31,6 +31,18 @@
  *
  *   // On logout:
  *   backendBridge.disconnect();
+ * backendBridge.js
+ *
+ * Connects the React frontend to the VDA Node.js backend when
+ * REACT_APP_API_URL is configured.
+ *
+ * Responsibilities:
+ *  1. WebSocket connection for real-time market data, account & order updates.
+ *  2. REST API helpers for order operations (place, close, modify).
+ *  3. Dispatches Redux actions so components stay in sync transparently.
+ *
+ * When REACT_APP_API_URL is NOT set this module is a no-op; the simulator
+ * (mt4Bridge) continues to drive all state.
  */
 
 import store from '../store';
@@ -84,237 +96,219 @@ class BackendBridge {
   }
 
   /**
-   * Load the authenticated user's account data + open orders + history from
-   * the backend, then open the WebSocket for real-time updates.
-   * Call this once after a successful login.
+   * Load the authenticated user's account data from the backend.
+   * @returns {Promise<object>} Account data object
    */
-  async initialize() {
-    if (!this.isConfigured() || !this._token) return;
-    try {
-      await Promise.all([
-        this._loadAccount(),
-        this._loadOrders(),
-        this._loadHistory(),
-      ]);
-      this._connectWs();
-    } catch (err) {
-      store.dispatch(addLog('error', `Backend init failed: ${err.message}`));
-    }
+  async loadAccount() {
+    const res = await fetch(`${API_BASE}/api/account`, {
+      headers: this._headers(),
+    });
+    if (!res.ok) throw new Error(`Account load failed: ${res.status}`);
+    return res.json();
   }
 
   /**
-   * Close the WebSocket connection and clear the stored token.
-   * Call this on logout.
+   * Load open and pending orders from the backend.
+   * @returns {Promise<{ open: object[], pending: object[] }>}
    */
+  async loadOrders() {
+    const res = await fetch(`${API_BASE}/api/orders`, {
+      headers: this._headers(),
+    });
+    if (!res.ok) throw new Error(`Orders load failed: ${res.status}`);
+    const data = await res.json();
+    const open    = Array.isArray(data)          ? data.filter((o) => !o.closeTime) : (data.open    || []);
+    const pending = Array.isArray(data)          ? []                               : (data.pending || []);
+    store.dispatch({ type: SET_ORDERS, payload: { open, pending } });
+    return { open, pending };
+  }
+
+  /**
+   * Load closed trade history from the backend.
+   * @returns {Promise<object[]>}
+   */
+  async loadHistory() {
+    const res = await fetch(`${API_BASE}/api/orders/history`, {
+      headers: this._headers(),
+    });
+    if (!res.ok) throw new Error(`History load failed: ${res.status}`);
+    const history = await res.json();
+    store.dispatch({ type: SET_ORDERS, payload: { history } });
+    return history;
+  }
+
+  /**
+   * Place a new order via the backend REST API.
+   * @param {object} order  Order details (symbol, type, lots, price, sl, tp)
+   * @returns {Promise<object>} Created order from backend
+   */
+  async placeOrder(order) {
+    const res = await fetch(`${API_BASE}/api/orders`, {
+      method:  'POST',
+      headers: this._headers(),
+      body:    JSON.stringify(order),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || `Place order failed: ${res.status}`);
+    }
+    const created = await res.json();
+    store.dispatch({ type: PLACE_ORDER, payload: created });
+    return created;
+  }
+
+  /**
+   * Close an open order via the backend REST API.
+   * @param {number} ticket  Order ticket number
+   * @returns {Promise<object>} Closed order from backend
+   */
+  async closeOrder(ticket) {
+    const res = await fetch(`${API_BASE}/api/orders/${ticket}`, {
+      method:  'DELETE',
+      headers: this._headers(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || `Close order failed: ${res.status}`);
+    }
+    const closed = await res.json();
+    store.dispatch({ type: CLOSE_ORDER, payload: ticket });
+    store.dispatch({ type: ADD_HISTORY_ORDER, payload: closed });
+    return closed;
+  }
+
+  /**
+   * Modify an existing order's stop loss / take profit.
+   * @param {number} ticket  Order ticket number
+   * @param {number|null} sl  Stop loss price (null to remove)
+   * @param {number|null} tp  Take profit price (null to remove)
+   * @returns {Promise<object>} Modified order from backend
+   */
+  async modifyOrder(ticket, sl, tp) {
+    const res = await fetch(`${API_BASE}/api/orders/${ticket}`, {
+      method:  'PATCH',
+      headers: this._headers(),
+      body:    JSON.stringify({ sl, tp }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || `Modify order failed: ${res.status}`);
+    }
+    const modified = await res.json();
+    store.dispatch({ type: MODIFY_ORDER, payload: { ticket, sl: modified.sl, tp: modified.tp } });
+    return modified;
+  }
+
+  /**
+   * Cancel a pending order via the backend REST API.
+   * @param {number} ticket  Order ticket number
+   * @returns {Promise<void>}
+   */
+  async cancelOrder(ticket) {
+    const res = await fetch(`${API_BASE}/api/orders/${ticket}`, {
+      method:  'DELETE',
+      headers: this._headers(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(err.error || `Cancel order failed: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  /** Open a WebSocket connection to the backend for real-time updates. */
+  connect() {
+    if (!WS_URL || this._ws) return;
+    this._reconnect = true;
+    this._openWs();
+  }
+
+  /** Close the WebSocket connection and stop reconnecting. */
   disconnect() {
     this._reconnect = false;
-    this._token     = null;
     if (this._ws) {
       this._ws.close();
       this._ws = null;
     }
-    store.dispatch(setConnectionStatus({ status: 'disconnected' }));
-  }
-
-  // ── Order operations ──────────────────────────────────────────────────────
-
-  /**
-   * Place a new order.
-   * @param {{ symbol, type, lots, price?, sl?, tp?, comment? }} order
-   * @returns {Promise<object>}  The created order from the server
-   */
-  async placeOrder(order) {
-    const data = await this._request('POST', '/api/orders', order);
-    // Merge the server-assigned ticket into the Redux store
-    store.dispatch({
-      type:    PLACE_ORDER,
-      payload: data,
-    });
-    store.dispatch(addLog('info',
-      `[API] Order #${data.ticket} placed: ${data.type} ${data.lots} ${data.symbol}`));
-    return data;
-  }
-
-  /**
-   * Close an open order (or cancel a pending order).
-   * @param {number} ticket  Order ticket number
-   * @returns {Promise<object>}  The closed order
-   */
-  async closeOrder(ticket) {
-    const data = await this._request('DELETE', `/api/orders/${ticket}`);
-    store.dispatch({ type: CLOSE_ORDER, payload: ticket });
-    store.dispatch({
-      type:    ADD_HISTORY_ORDER,
-      payload: data,
-    });
-    store.dispatch(addLog('info',
-      `[API] Order #${ticket} closed`));
-    return data;
-  }
-
-  /**
-   * Modify the SL/TP of an existing order.
-   * @param {number}      ticket
-   * @param {number|null} sl
-   * @param {number|null} tp
-   * @returns {Promise<object>}  The updated order
-   */
-  async modifyOrder(ticket, sl, tp) {
-    const data = await this._request('PATCH', `/api/orders/${ticket}`, { sl, tp });
-    store.dispatch({ type: MODIFY_ORDER, payload: { ticket, sl, tp } });
-    store.dispatch(addLog('info',
-      `[API] Order #${ticket} modified: SL=${sl || '—'} TP=${tp || '—'}`));
-    return data;
-  }
-
-  /**
-   * Change the account leverage.
-   * @param {number} leverage
-   * @returns {Promise<{ leverage: number }>}
-   */
-  async setLeverage(leverage) {
-    const data = await this._request('PATCH', '/api/account/leverage', { leverage });
-    store.dispatch({ type: SET_LEVERAGE, payload: data.leverage });
-    return data;
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  /** Fetch and dispatch account data. */
-  async _loadAccount() {
-    const account = await this._request('GET', '/api/account');
-    store.dispatch(updateAccount(account));
+  _headers() {
+    const h = { 'Content-Type': 'application/json' };
+    if (this._token) h['Authorization'] = `Bearer ${this._token}`;
+    return h;
   }
 
-  /** Fetch open + pending orders and replace the Redux store. */
-  async _loadOrders() {
-    const { open, pending } = await this._request('GET', '/api/orders');
-    store.dispatch({ type: SET_ORDERS, payload: { open, pending } });
-  }
-
-  /** Fetch trade history and replace the history slice in Redux. */
-  async _loadHistory() {
-    const { history } = await this._request('GET', '/api/orders/history');
-    store.dispatch({ type: SET_ORDERS, payload: { history } });
-  }
-
-  /**
-   * Generic fetch wrapper.
-   * @param {'GET'|'POST'|'PATCH'|'DELETE'} method
-   * @param {string}  path     API path starting with /
-   * @param {object}  [body]   Request body (for POST / PATCH)
-   * @returns {Promise<any>}   Parsed JSON response
-   */
-  async _request(method, path, body) {
-    const headers = { 'Content-Type': 'application/json' };
-    if (this._token) headers['Authorization'] = `Bearer ${this._token}`;
-
-    const opts = { method, headers };
-    if (body && method !== 'GET') opts.body = JSON.stringify(body);
-
-    const res = await fetch(`${API_BASE}${path}`, opts);
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || `${method} ${path} failed (${res.status})`);
-    }
-    return data;
-  }
-
-  // ── WebSocket ─────────────────────────────────────────────────────────────
-
-  _connectWs() {
-    if (!WS_URL) return;
-
-    this._reconnect = true;
-    store.dispatch(setConnectionStatus({ status: 'connecting', broker: API_BASE }));
-    store.dispatch(addLog('info', `[WS] Connecting to ${WS_URL}…`));
-
+  _openWs() {
+    const url = this._token ? `${WS_URL}?token=${encodeURIComponent(this._token)}` : WS_URL;
+    let ws;
     try {
-      this._ws = new WebSocket(WS_URL);
-    } catch (err) {
-      store.dispatch(setConnectionStatus({ status: 'error' }));
-      store.dispatch(addLog('error', `[WS] Could not open socket: ${err.message}`));
+      ws = new WebSocket(url);
+    } catch (e) {
+      store.dispatch(addLog('error', `[WS] Cannot create connection: ${e.message}`));
       return;
     }
+    this._ws = ws;
 
-    this._ws.onopen = () => {
-      store.dispatch(addLog('info', '[WS] Connected – authenticating…'));
-      // Authenticate the WS connection so the server scopes updates to this account
-      if (this._token) {
-        this._ws.send(JSON.stringify({ type: 'auth', token: this._token }));
-      }
-
-      // Request candle history for the active symbol
-      const state = store.getState();
-      const { activeSymbol, timeframe } = state.market;
-      this._ws.send(JSON.stringify({
-        type:      'subscribe_candles',
-        symbol:    activeSymbol,
-        timeframe,
-      }));
+    ws.onopen = () => {
+      store.dispatch(setConnectionStatus('connected'));
+      store.dispatch(addLog('info', '[WS] Connected to backend'));
     };
 
-    this._ws.onmessage = (evt) => {
-      let msg;
-      try {
-        msg = JSON.parse(evt.data);
-      } catch {
-        return;
+    ws.onclose = () => {
+      store.dispatch(setConnectionStatus('disconnected'));
+      this._ws = null;
+      if (this._reconnect) {
+        store.dispatch(addLog('warn', `[WS] Disconnected — reconnecting in ${RECONNECT_DELAY_MS / 1000}s`));
+        setTimeout(() => { if (this._reconnect) this._openWs(); }, RECONNECT_DELAY_MS);
       }
-      this._handleWsMessage(msg);
     };
 
-    this._ws.onerror = () => {
-      store.dispatch(setConnectionStatus({ status: 'error' }));
+    ws.onerror = () => {
       store.dispatch(addLog('error', '[WS] Connection error'));
     };
 
-    this._ws.onclose = () => {
-      store.dispatch(setConnectionStatus({ status: 'disconnected' }));
-      if (this._reconnect) {
-        store.dispatch(addLog('warn',
-          `[WS] Disconnected. Reconnecting in ${RECONNECT_DELAY_MS / 1000}s…`));
-        setTimeout(() => {
-          if (this._reconnect) this._connectWs();
-        }, RECONNECT_DELAY_MS);
-      }
+    ws.onmessage = (event) => {
+      let msg;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      this._handleMessage(msg);
     };
   }
 
-  _handleWsMessage(msg) {
+  _handleMessage(msg) {
     switch (msg.type) {
-      case 'welcome':
-        break;
-
-      case 'auth_ok':
-        store.dispatch(setConnectionStatus({ status: 'connected', broker: API_BASE }));
-        store.dispatch(addLog('info', `[WS] Authenticated as ${msg.role}: ${msg.name}`));
-        break;
-
-      case 'auth_error':
-        store.dispatch(addLog('error', `[WS] Auth error: ${msg.message}`));
-        break;
-
       case 'quote':
         store.dispatch(updateQuote(msg.symbol, msg.bid, msg.ask, msg.time));
         break;
 
       case 'candles':
-        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data));
+        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.candles || msg.data));
         break;
 
       case 'candle':
         store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.candle));
         break;
 
-      case 'account': {
-        const { type: _t, accountId: _a, ...accountData } = msg;
-        store.dispatch(updateAccount(accountData));
+      case 'account':
+        store.dispatch({ type: 'UPDATE_ACCOUNT', payload: msg.account });
+        if (msg.account.leverage) {
+          store.dispatch({ type: SET_LEVERAGE, payload: msg.account.leverage });
+        }
         break;
-      }
 
-      case 'order':
-        // Real-time order updates pushed by the server (SL/TP triggered, etc.)
+      case 'orders':
+        store.dispatch({
+          type:    SET_ORDERS,
+          payload: {
+            open:    msg.open    || [],
+            pending: msg.pending || [],
+            history: msg.history || [],
+          },
+        });
+        break;
+
+      case 'order': {
         if (msg.action === 'open') {
           store.dispatch({ type: PLACE_ORDER, payload: msg.order });
         } else if (msg.action === 'close') {
@@ -327,6 +321,7 @@ class BackendBridge {
           });
         }
         break;
+      }
 
       case 'error':
         store.dispatch(addLog('warn', `[WS] Server error: ${msg.message}`));

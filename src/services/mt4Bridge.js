@@ -18,6 +18,10 @@ import {
   updateOrderProfit,
   closeOrder,
   placeOrder,
+  modifyOrder,
+  setOrders,
+  addHistoryOrder,
+  cancelPendingOrder,
   setConnectionStatus,
   addLog,
 } from '../store/actions';
@@ -228,6 +232,11 @@ class MT4Bridge {
     this._ws.onopen = () => {
       store.dispatch(setConnectionStatus({ status: 'connected', broker: url }));
       store.dispatch(addLog('info', 'Connected to MT4 bridge'));
+      // Authenticate with JWT if available
+      const token = localStorage.getItem('vda_token');
+      if (token) {
+        this._ws.send(JSON.stringify({ type: 'auth', token }));
+      }
     };
 
     this._ws.onmessage = (evt) => {
@@ -255,17 +264,46 @@ class MT4Bridge {
 
   _handleBridgeMessage(msg) {
     switch (msg.type) {
+      case 'welcome':
+        store.dispatch(addLog('info', msg.message || 'WebSocket connected'));
+        break;
+      case 'auth_ok':
+        store.dispatch(setConnectionStatus({ status: 'connected', broker: msg.name || 'VDA Backend' }));
+        store.dispatch(addLog('info', `Authenticated as ${msg.role} — ${msg.name}`));
+        // Request open orders from backend after successful auth
+        if (this._ws && this._ws.readyState === WebSocket.OPEN) {
+          this._ws.send(JSON.stringify({ type: 'get_orders' }));
+        }
+        break;
+      case 'auth_error':
+        store.dispatch(addLog('error', `Auth error: ${msg.message}`));
+        break;
       case 'quote':
         store.dispatch(updateQuote(msg.symbol, msg.bid, msg.ask, msg.time));
         break;
       case 'candles':
-        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data));
+        store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data || msg.candles));
         break;
       case 'candle':
         store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data));
         break;
       case 'account':
         store.dispatch(updateAccount(msg.data));
+        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data || msg.candle));
+        break;
+      case 'account': {
+        // eslint-disable-next-line no-unused-vars
+        const { type: _t, ...accountData } = msg;
+        store.dispatch(updateAccount(accountData));
+        break;
+      }
+      case 'order':
+        this._handleOrderMessage(msg);
+        break;
+      case 'orders':
+        store.dispatch(setOrders(msg.open || [], msg.pending || [], msg.history || []));
+        break;
+      case 'risk':
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));
