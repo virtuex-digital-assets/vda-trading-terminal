@@ -380,6 +380,35 @@ class BackendBridge {
     return this._request('PATCH', `/api/admin/users/${userId}/status`, { status });
   }
 
+  // ── Wallet ───────────────────────────────────────────────────────────────
+  walletDeposit(amount, note, reference) {
+    return this._request('POST', '/api/wallet/deposit', { amount, note, reference });
+  }
+  walletWithdraw(amount, note, reference) {
+    return this._request('POST', '/api/wallet/withdraw', { amount, note, reference });
+  }
+  getWalletTransactions(limit) {
+    return this._request('GET', `/api/wallet/transactions${limit ? `?limit=${limit}` : ''}`);
+  }
+  getAllWalletTransactions(limit) {
+    return this._request('GET', `/api/wallet/transactions/all${limit ? `?limit=${limit}` : ''}`);
+  }
+  updateWalletTxStatus(txId, status) {
+    return this._request('PATCH', `/api/wallet/transactions/${txId}/status`, { status });
+  }
+
+  // ── 2FA ──────────────────────────────────────────────────────────────────
+  setup2FA()                 { return this._request('POST', '/api/auth/2fa/setup'); }
+  verify2FA(token)           { return this._request('POST', '/api/auth/2fa/verify', { token }); }
+  disable2FA(token)          { return this._request('POST', '/api/auth/2fa/disable', { token }); }
+
+  // ── Admin metrics ─────────────────────────────────────────────────────────
+  getMetrics()               { return this._request('GET', '/api/admin/metrics'); }
+
+  // ── Generic helpers (used by components) ─────────────────────────────────
+  get(path)                  { return this._request('GET',  `/api${path}`); }
+  post(path, body)           { return this._request('POST', `/api${path}`, body); }
+
 }
 
 const backendBridge = new BackendBridge();

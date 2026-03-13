@@ -20,6 +20,9 @@ module.exports = {
   tickIntervalMs: parseInt(process.env.TICK_INTERVAL_MS || '500', 10),
   candleHistoryCount: parseInt(process.env.CANDLE_HISTORY_COUNT || '200', 10),
 
+  // Market data provider: 'simulator' (default) | 'external'
+  marketDataProvider: process.env.MARKET_DATA_PROVIDER || 'simulator',
+
   // CORS – origins allowed to call the REST API
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),
 };

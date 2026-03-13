@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const {
   getRisk, listAccounts, listAllOrders, forceCloseOrder,
-  adjustBalance, listUsers, createUser, setUserStatus, getAuditLog,
+  adjustBalance, listUsers, createUser, setUserStatus, getAuditLog, getMetrics,
 } = require('../controllers/adminController');
 const { authMiddleware, adminOnly, superAdminOnly } = require('../middleware/auth');
 const { adminLimiter } = require('../middleware/rateLimiter');
@@ -13,6 +13,7 @@ router.use(adminLimiter, authMiddleware);
 
 // ── Admin + super_admin routes ────────────────────────────────────────────
 router.get('/risk',                            adminOnly, getRisk);
+router.get('/metrics',                         adminOnly, getMetrics);
 router.get('/accounts',                        adminOnly, listAccounts);
 router.get('/orders',                          adminOnly, listAllOrders);
 router.post('/orders/:ticket/close',           adminOnly, auditLog, forceCloseOrder);

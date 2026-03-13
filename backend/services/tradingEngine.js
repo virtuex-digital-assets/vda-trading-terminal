@@ -2,13 +2,45 @@
  * Core trading engine.
  *
  * Handles order placement, modification, closure, margin calculation,
- * P&L updates, and stop-loss / take-profit trigger logic.
+ * P&L updates, stop-loss / take-profit trigger logic, and realistic
+ * slippage simulation.
  *
  * All methods are synchronous and operate on the in-memory store.
  */
 
 const db = require('../models');
 const { calculateMargin, calculatePnL } = require('../utils/margin');
+
+// ── Slippage helpers ────────────────────────────────────────────────────────
+
+/**
+ * Apply realistic slippage to a market order execution price.
+ *
+ * Slippage is modelled as a random fraction of the symbol's spread:
+ *   slip = spread × U[0, SLIP_FACTOR]
+ * For a BUY the execution price is nudged UP (adverse); for a SELL it is
+ * nudged DOWN.  This reflects the real-world behaviour of a market maker
+ * widening quotes under fast-market conditions.
+ *
+ * @param {string}  symbol
+ * @param {string}  type      'BUY' | 'SELL'
+ * @param {number}  price     Raw mid/ask/bid price
+ * @returns {number}  Slippage-adjusted execution price
+ */
+const SLIP_FACTOR = 1.5; // max slippage = 1.5× spread
+
+function applySlippage(symbol, type, price) {
+  try {
+    const cfg    = db.symbolRegistry && db.symbolRegistry.get(symbol);
+    const spread = cfg ? (cfg.spread || 0) : 0;
+    const slip   = spread * Math.random() * SLIP_FACTOR;
+    // BUY  → trader pays more (price rises)
+    // SELL → trader receives less (price falls)
+    return type === 'BUY' ? price + slip : price - slip;
+  } catch (_) {
+    return price;
+  }
+}
 
 /**
  * Place a new order.
@@ -34,9 +66,14 @@ function placeOrder({ accountId, symbol, type, lots, price, sl, tp, comment }) {
   const isMarket = type === 'BUY' || type === 'SELL';
   const isBuy    = type.startsWith('BUY');
 
-  const execPrice = isMarket
+  let execPrice = isMarket
     ? (isBuy ? quote.ask : quote.bid)
     : (price || 0);
+
+  // Apply slippage only to market orders
+  if (isMarket) {
+    execPrice = applySlippage(symbol, type, execPrice);
+  }
 
   if (!execPrice || execPrice <= 0) {
     return { ok: false, error: 'Invalid execution price' };
@@ -234,6 +271,13 @@ function totalFloatingProfit(accountId) {
 
 /**
  * Broker-level risk summary across ALL accounts.
+ *
+ * Returns:
+ *  symbolExposure  – per-symbol buy/sell/net lots and unrealised P&L
+ *  accountSummary  – per-account snapshot with margin health score
+ *  marginHeatmap   – symbols ranked by net exposure (for heatmap display)
+ *  liquidationRisk – accounts at or near margin call (level < 150%)
+ *  totals          – platform-wide aggregates
  */
 function getBrokerRisk() {
   const symbolExposure = {};   // symbol → { buyLots, sellLots, netLots, unrealisedPnL }
@@ -253,20 +297,77 @@ function getBrokerRisk() {
     exp.unrealisedPnL = parseFloat((exp.unrealisedPnL + (order.profit || 0)).toFixed(2));
   });
 
+  let totalBalance    = 0;
+  let totalEquity     = 0;
+  let totalMargin     = 0;
+  let totalProfit     = 0;
+  let openOrderCount  = 0;
+
   db.accounts.forEach((account) => {
+    const acctOrders = [...db.openOrders.values()].filter((o) => o.accountId === account.id);
+    const marginLevel = account.marginLevel || 0;
+
+    // Health score: 100 = fully healthy, 0 = margin call imminent
+    let healthScore = 100;
+    if (account.margin > 0) {
+      healthScore = Math.min(100, Math.max(0, Math.round((marginLevel / 200) * 100)));
+    }
+
     accountSummary.push({
-      accountId:  account.id,
-      login:      account.login,
-      balance:    account.balance,
-      equity:     account.equity,
-      margin:     account.margin,
+      accountId:   account.id,
+      login:       account.login,
+      balance:     account.balance,
+      equity:      account.equity,
+      margin:      account.margin,
+      freeMargin:  account.freeMargin,
       marginLevel: account.marginLevel,
-      profit:     account.profit,
-      openOrders: [...db.openOrders.values()].filter((o) => o.accountId === account.id).length,
+      profit:      account.profit,
+      openOrders:  acctOrders.length,
+      healthScore,
     });
+
+    totalBalance   += account.balance;
+    totalEquity    += account.equity;
+    totalMargin    += account.margin;
+    totalProfit    += account.profit || 0;
+    openOrderCount += acctOrders.length;
   });
 
-  return { symbolExposure, accountSummary };
+  // Margin heatmap: symbols sorted by absolute net exposure
+  const marginHeatmap = Object.entries(symbolExposure)
+    .map(([symbol, exp]) => ({
+      symbol,
+      netLots:      exp.netLots,
+      absNetLots:   Math.abs(exp.netLots),
+      buyLots:      exp.buyLots,
+      sellLots:     exp.sellLots,
+      unrealisedPnL: exp.unrealisedPnL,
+    }))
+    .sort((a, b) => b.absNetLots - a.absNetLots);
+
+  // Liquidation risk: accounts with margin level < 150% (and margin > 0)
+  const liquidationRisk = accountSummary
+    .filter((a) => a.margin > 0 && a.marginLevel < 150)
+    .sort((a, b) => a.marginLevel - b.marginLevel)
+    .map((a) => ({
+      accountId:   a.accountId,
+      login:       a.login,
+      marginLevel: a.marginLevel,
+      equity:      a.equity,
+      margin:      a.margin,
+      riskLevel:   a.marginLevel < 50 ? 'CRITICAL' : a.marginLevel < 100 ? 'HIGH' : 'MEDIUM',
+    }));
+
+  const totals = {
+    totalBalance:   parseFloat(totalBalance.toFixed(2)),
+    totalEquity:    parseFloat(totalEquity.toFixed(2)),
+    totalMargin:    parseFloat(totalMargin.toFixed(2)),
+    totalProfit:    parseFloat(totalProfit.toFixed(2)),
+    openOrderCount,
+    accountCount:   db.accounts.size,
+  };
+
+  return { symbolExposure, accountSummary, marginHeatmap, liquidationRisk, totals };
 }
 
 module.exports = {
