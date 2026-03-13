@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { closeOrder, modifyOrder, addLog, updateAccount } from '../../store/actions';
 import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
+import backendBridge from '../../services/backendBridge';
 import './Positions.css';
 
 const TABS = ['Positions', 'Orders', 'History'];
@@ -89,7 +90,15 @@ const Positions = () => {
   const { quotes } = useSelector((s) => s.market);
   const { balance } = useSelector((s) => s.account);
 
-  const handleClose = (ticket, symbol, type, lots, openPrice) => {
+  const handleClose = async (ticket, symbol, type, lots, openPrice) => {
+    if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.closeOrder(ticket);
+      } catch (err) {
+        dispatch(addLog('error', `Close order failed: ${err.message}`));
+      }
+      return;
+    }
     const q = quotes[symbol] || {};
     const closePrice = type === 'BUY' ? q.bid : q.ask;
     const order = openOrders.find((o) => o.ticket === ticket);
@@ -102,7 +111,15 @@ const Positions = () => {
     );
   };
 
-  const handleModifySave = (ticket, sl, tp) => {
+  const handleModifySave = async (ticket, sl, tp) => {
+    if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.modifyOrder(ticket, sl, tp);
+      } catch (err) {
+        dispatch(addLog('error', `Modify order failed: ${err.message}`));
+      }
+      return;
+    }
     dispatch(modifyOrder(ticket, sl, tp));
     dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
   };

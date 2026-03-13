@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
+import backendBridge from '../../services/backendBridge';
 import './OrderPanel.css';
 
 const ORDER_TYPES = ['BUY', 'SELL', 'BUY LIMIT', 'SELL LIMIT', 'BUY STOP', 'SELL STOP'];
@@ -35,7 +36,7 @@ const OrderPanel = () => {
 
   const canTrade = freeMargin >= requiredMargin && openPrice > 0 && lots > 0;
 
-  const submitOrder = (type) => {
+  const submitOrder = async (type) => {
     const isBuyType = type.startsWith('BUY');
     const execPrice = isMarket
       ? (isBuyType ? quote.ask : quote.bid)
@@ -62,14 +63,22 @@ const OrderPanel = () => {
       comment,
     };
 
-    dispatch(placeOrder(order));
-    // Note: account margin is recalculated automatically on each simulator tick
-    dispatch(
-      addLog(
-        'info',
-        `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
-      )
-    );
+    if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.placeOrder(order);
+      } catch (err) {
+        dispatch(addLog('error', `Order failed: ${err.message}`));
+        return;
+      }
+    } else {
+      dispatch(placeOrder(order));
+      dispatch(
+        addLog(
+          'info',
+          `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
+        )
+      );
+    }
     setPrice('');
     setComment('');
   };

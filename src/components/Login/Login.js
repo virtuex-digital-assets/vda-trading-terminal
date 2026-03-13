@@ -37,11 +37,11 @@ const Login = ({ onLogin }) => {
         // Role detection from email prefix
         const e = email.toLowerCase();
         if (e.includes('superadmin') || e.includes('super_admin') || e.includes('root')) {
-          onLogin('super_admin');
+          onLogin('super_admin', null);
         } else if (e.includes('admin')) {
-          onLogin('admin');
+          onLogin('admin', null);
         } else {
-          onLogin('trader');
+          onLogin('trader', null);
         }
       }, 400);
       return;
@@ -62,7 +62,7 @@ const Login = ({ onLogin }) => {
       }
       localStorage.setItem('vda_token', data.token);
       localStorage.setItem('vda_user',  JSON.stringify(data.user));
-      onLogin(data.user.role);
+      onLogin(data.user.role, data.token);
     } catch {
       setError('Cannot reach server. Switching to demo mode.');
       setIsDemo(true);
