@@ -18,6 +18,7 @@ import {
   updateOrderProfit,
   closeOrder,
   placeOrder,
+  addHistoryOrder,
   setConnectionStatus,
   addLog,
 } from '../store/actions';
@@ -228,6 +229,11 @@ class MT4Bridge {
     this._ws.onopen = () => {
       store.dispatch(setConnectionStatus({ status: 'connected', broker: url }));
       store.dispatch(addLog('info', 'Connected to MT4 bridge'));
+      // Authenticate with the backend so it sends account-scoped updates.
+      const token = localStorage.getItem('vda_token');
+      if (token) {
+        this._ws.send(JSON.stringify({ type: 'auth', token }));
+      }
     };
 
     this._ws.onmessage = (evt) => {
@@ -262,10 +268,30 @@ class MT4Bridge {
         store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data));
         break;
       case 'candle':
-        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data));
+        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.candle));
         break;
-      case 'account':
-        store.dispatch(updateAccount(msg.data));
+      case 'account': {
+        // Server spreads account fields directly onto the message object.
+        // Strip the protocol 'type' key before dispatching to Redux.
+        // eslint-disable-next-line no-unused-vars
+        const { type: _t, ...accountData } = msg;
+        store.dispatch(updateAccount(accountData));
+        break;
+      }
+      case 'order':
+        // Order events (open / close / modify) broadcast by the server after
+        // a REST-initiated trade.  Re-sync the full order list on close so
+        // history is always accurate.
+        if (msg.action === 'close') {
+          store.dispatch(closeOrder(msg.order.ticket));
+          store.dispatch(addHistoryOrder(msg.order));
+        }
+        break;
+      case 'auth_ok':
+        store.dispatch(addLog('info', `Authenticated as ${msg.name} (${msg.role})`));
+        break;
+      case 'auth_error':
+        store.dispatch(addLog('error', `WS auth failed: ${msg.message}`));
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));

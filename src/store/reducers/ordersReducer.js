@@ -1,4 +1,4 @@
-import { PLACE_ORDER, CLOSE_ORDER, MODIFY_ORDER, UPDATE_ORDER_PROFIT, CANCEL_PENDING_ORDER } from '../actions/actionTypes';
+import { PLACE_ORDER, CLOSE_ORDER, MODIFY_ORDER, UPDATE_ORDER_PROFIT, CANCEL_PENDING_ORDER, SET_ORDERS, ADD_HISTORY_ORDER } from '../actions/actionTypes';
 
 let ticketCounter = 1000;
 
@@ -11,7 +11,15 @@ const initialState = {
 const ordersReducer = (state = initialState, action) => {
   switch (action.type) {
     case PLACE_ORDER: {
-      const order = { ...action.payload, ticket: ++ticketCounter, openTime: new Date().toISOString(), profit: 0 };
+      // Use server-assigned ticket when available (backend mode), otherwise
+      // generate a client-side ticket for simulator mode.
+      const ticket = action.payload.ticket ?? ++ticketCounter;
+      const order = {
+        ...action.payload,
+        ticket,
+        openTime: action.payload.openTime ?? new Date().toISOString(),
+        profit: action.payload.profit ?? 0,
+      };
       if (order.type === 'BUY' || order.type === 'SELL') {
         return { ...state, openOrders: [...state.openOrders, order] };
       }
@@ -56,6 +64,19 @@ const ordersReducer = (state = initialState, action) => {
         ...state,
         pendingOrders: state.pendingOrders.filter((o) => o.ticket !== action.payload),
       };
+    }
+
+    // ── Backend sync ──────────────────────────────────────────────────────
+
+    case SET_ORDERS: {
+      // Replace entire orders state with data from the backend.
+      const { open = [], pending = [], history = [] } = action.payload;
+      return { ...state, openOrders: open, pendingOrders: pending, history };
+    }
+
+    case ADD_HISTORY_ORDER: {
+      // Prepend a single closed order returned by the REST close endpoint.
+      return { ...state, history: [action.payload, ...state.history] };
     }
 
     default:

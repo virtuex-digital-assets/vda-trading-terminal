@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
+import backendBridge from './services/backendBridge';
 
 import MarketWatch    from './components/MarketWatch/MarketWatch';
 import Chart          from './components/Chart/Chart';
@@ -40,6 +41,11 @@ const AppInner = () => {
     setShowLogin(false);
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin') setAppMode('broker');
+    // When connected to the live backend, load account state and orders.
+    if (backendBridge.isConfigured()) {
+      backendBridge.loadAccount();
+      backendBridge.loadOrders();
+    }
   };
 
   const handleLogout = () => {
