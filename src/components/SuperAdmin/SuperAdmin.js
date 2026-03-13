@@ -47,7 +47,6 @@ const DEFAULT_SYMBOLS = [
 ];
 
 const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'settings'];
-const TABS = ['overview', 'accounts', 'symbols', 'trades', 'audit', 'settings'];
 const TAB_LABELS = {
   overview: '📊 Overview',
   crm:      '👥 CRM',

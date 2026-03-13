@@ -1,4 +1,4 @@
-import { PLACE_ORDER } from '../actions';
+import { PLACE_ORDER } from '../actions/actionTypes';
 
 const SUPPORTED_ASSETS = ['BTC', 'ETH', 'BNB', 'SOL', 'ADA'];
 
