@@ -61,7 +61,9 @@ function seedCandles() {
 
   // Use the symbol registry for the canonical list; fall back to DEFAULT_SYMBOLS
   const symbols = db.symbolRegistry
-    ? [...db.symbolRegistry.keys()]
+    ? [...db.symbolRegistry.entries()]
+        .filter(([, cfg]) => cfg && cfg.active)
+        .map(([sym]) => sym)
     : DEFAULT_SYMBOLS;
 
   symbols.forEach((sym) => {
