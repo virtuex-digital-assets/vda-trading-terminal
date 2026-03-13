@@ -71,6 +71,7 @@ const ordersReducer = (state = initialState, action) => {
     }
 
     case SET_ORDERS: {
+      // Replace order lists loaded from the backend (undefined keys are left unchanged)
       // Only replace the keys that are explicitly provided in the payload.
       const { open, pending, history } = action.payload;
       return {

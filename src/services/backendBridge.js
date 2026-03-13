@@ -1,4 +1,36 @@
 /**
+ * Backend Bridge Service
+ *
+ * Provides a unified interface for all backend REST API calls and real-time
+ * WebSocket communication with the VDA Trading Terminal backend server.
+ *
+ * When REACT_APP_API_URL is set the bridge:
+ *   - Authenticates with the REST API and stores the JWT
+ *   - Loads account data and orders on login
+ *   - Routes order placement / modification / closing through REST endpoints
+ *   - Opens a WebSocket for real-time price quotes, candle updates, and
+ *     per-account position / balance updates
+ *
+ * When REACT_APP_API_URL is NOT set the bridge is a no-op and the built-in
+ * mt4Bridge simulator takes over.
+ *
+ * Usage:
+ *   import backendBridge from './backendBridge';
+ *
+ *   // Check whether the backend is configured
+ *   backendBridge.isConfigured();           // boolean
+ *
+ *   // After a successful login:
+ *   backendBridge.setToken(token);
+ *   await backendBridge.initialize();       // loads account + orders, opens WS
+ *
+ *   // Order operations (return the response data or throw on error):
+ *   const order = await backendBridge.placeOrder({ symbol, type, lots, ... });
+ *   const closed = await backendBridge.closeOrder(ticket);
+ *   const modified = await backendBridge.modifyOrder(ticket, sl, tp);
+ *
+ *   // On logout:
+ *   backendBridge.disconnect();
  * backendBridge.js
  *
  * Connects the React frontend to the VDA Node.js backend when
@@ -15,6 +47,7 @@
 
 import store from '../store';
 import {
+  updateAccount,
   updateQuote,
   setCandles,
   addCandle,
@@ -298,6 +331,44 @@ class BackendBridge {
         break;
     }
   }
+  // ── Auth (convenience wrappers) ──────────────────────────────────────────
+  login(email, password)    { return this._request('POST', '/api/auth/login',    { email, password }); }
+  register(email, password, name) { return this._request('POST', '/api/auth/register', { email, password, name }); }
+  me()                      { return this._request('GET',  '/api/auth/me'); }
+
+  // ── Order REST wrappers ───────────────────────────────────────────────────
+  getOrders()               { return this._request('GET',  '/api/orders'); }
+  getHistory()              { return this._request('GET',  '/api/orders/history'); }
+
+  // ── Account REST wrappers ─────────────────────────────────────────────────
+  getAccount()              { return this._request('GET',   '/api/account'); }
+
+  // ── Symbol management ─────────────────────────────────────────────────────
+  getSymbols()              { return this._request('GET',   '/api/symbols'); }
+  getCandles(symbol, timeframe, count) {
+    return this._request('GET', `/api/symbols/${symbol}/candles?timeframe=${timeframe}&count=${count || 200}`);
+  }
+  createSymbol(data)        { return this._request('POST',   '/api/symbols', data); }
+  updateSymbol(symbol, data) { return this._request('PATCH', `/api/symbols/${symbol}`, data); }
+  deleteSymbol(symbol)       { return this._request('DELETE', `/api/symbols/${symbol}`); }
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
+  getRisk()                 { return this._request('GET',  '/api/admin/risk'); }
+  getAdminAccounts()        { return this._request('GET',  '/api/admin/accounts'); }
+  getAdminOrders()          { return this._request('GET',  '/api/admin/orders'); }
+  forceCloseOrder(ticket)   { return this._request('POST', `/api/admin/orders/${ticket}/close`); }
+  adjustBalance(accountId, amount, note) {
+    return this._request('POST', `/api/admin/accounts/${accountId}/adjust`, { amount, note });
+  }
+  getAuditLog(limit)        { return this._request('GET', `/api/admin/audit?limit=${limit || 100}`); }
+
+  // ── Super Admin ──────────────────────────────────────────────────────────
+  getUsers()                { return this._request('GET',  '/api/admin/users'); }
+  createUser(data)          { return this._request('POST', '/api/admin/users', data); }
+  setUserStatus(userId, status) {
+    return this._request('PATCH', `/api/admin/users/${userId}/status`, { status });
+  }
+
 }
 
 const backendBridge = new BackendBridge();

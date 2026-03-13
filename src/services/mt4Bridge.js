@@ -25,7 +25,7 @@ import {
   setConnectionStatus,
   addLog,
 } from '../store/actions';
-
+import { CANCEL_PENDING_ORDER } from '../store/actions/actionTypes';
 import { generateSimulatedCandles, simulateNextCandle } from '../utils/marketSimulator';
 import { getSpread, calculateProfit, calculateMargin, getPricePrecision } from '../utils/constants';
 
@@ -38,31 +38,16 @@ class MT4Bridge {
     this._simulationInterval = null;
     this._useSimulator = true;
     this._bridgeUrl = null;
-    this._authToken = null;
   }
 
   /**
    * Connect to a live MT4 bridge WebSocket server.
    * @param {string} url  WebSocket URL, e.g. ws://localhost:5000
-   * @param {string} [token]  Optional JWT to authenticate on the backend WS.
    */
-  connect(url, token) {
+  connect(url) {
     this._bridgeUrl = url;
     this._useSimulator = false;
-    if (token) this._authToken = token;
     this._openSocket(url);
-  }
-
-  /**
-   * Update the JWT used to authenticate with the backend WebSocket.
-   * Call this after a successful login when the bridge is already connected.
-   * @param {string} token
-   */
-  setAuthToken(token) {
-    this._authToken = token;
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-      this._ws.send(JSON.stringify({ type: 'auth', token }));
-    }
   }
 
   /** Start the built-in demo simulator (no real MT4 required). */
@@ -102,16 +87,6 @@ class MT4Bridge {
     if (this._ws) {
       this._ws.close();
       this._ws = null;
-    }
-  }
-
-  /**
-   * Subscribe to candle history for a symbol/timeframe via WebSocket.
-   * The backend will respond with a { type: 'candles', ... } message.
-   */
-  subscribeCandles(symbol, timeframe) {
-    if (this._ws && this._ws.readyState === WebSocket.OPEN) {
-      this._ws.send(JSON.stringify({ type: 'subscribe_candles', symbol, timeframe }));
     }
   }
 
@@ -210,7 +185,7 @@ class MT4Bridge {
 
       if (triggered) {
         // Remove pending, place as market order
-        store.dispatch(cancelPendingOrder(order.ticket));
+        store.dispatch({ type: CANCEL_PENDING_ORDER, payload: order.ticket });
         const marketType = order.type.startsWith('BUY') ? 'BUY' : 'SELL';
         store.dispatch(placeOrder({
           ...order,
@@ -310,6 +285,10 @@ class MT4Bridge {
         store.dispatch(setCandles(msg.symbol, msg.timeframe, msg.data || msg.candles));
         break;
       case 'candle':
+        store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data));
+        break;
+      case 'account':
+        store.dispatch(updateAccount(msg.data));
         store.dispatch(addCandle(msg.symbol, msg.timeframe, msg.data || msg.candle));
         break;
       case 'account': {
@@ -328,42 +307,6 @@ class MT4Bridge {
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));
-    }
-  }
-
-  _handleOrderMessage(msg) {
-    const { action, order } = msg;
-    if (!order) return;
-    switch (action) {
-      case 'open':
-        // Add to local store if not already present
-        if (!store.getState().orders.openOrders.find((o) => o.ticket === order.ticket) &&
-            !store.getState().orders.pendingOrders.find((o) => o.ticket === order.ticket)) {
-          store.dispatch(placeOrder(order));
-        }
-        break;
-      case 'close': {
-        // Move from open to history
-        const exists = store.getState().orders.openOrders.find((o) => o.ticket === order.ticket);
-        if (exists) {
-          store.dispatch(closeOrder(order.ticket));
-          if (order.closeTime) {
-            store.dispatch(addHistoryOrder({ ...order }));
-          }
-        } else {
-          // May be a pending order cancellation
-          store.dispatch(cancelPendingOrder(order.ticket));
-        }
-        if (order.balance != null) {
-          store.dispatch(updateAccount({ balance: order.balance }));
-        }
-        break;
-      }
-      case 'modify':
-        store.dispatch(modifyOrder(order.ticket, order.sl, order.tp));
-        break;
-      default:
-        break;
     }
   }
 }

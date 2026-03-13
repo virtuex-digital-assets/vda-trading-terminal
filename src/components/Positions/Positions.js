@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { closeOrder, modifyOrder, addLog, updateAccount } from '../../store/actions';
 import { closeOrder, modifyOrder, cancelPendingOrder, addLog, updateAccount, addHistoryOrder } from '../../store/actions';
 import backendBridge from '../../services/backendBridge';
 import { formatPrice, formatProfit, formatDateTime } from '../../utils/formatters';
@@ -86,14 +87,29 @@ const Positions = () => {
   const dispatch = useDispatch();
   const [tab, setTab] = useState('Positions');
   const [modifyTarget, setModifyTarget] = useState(null);
-  const [closingTicket, setClosingTicket] = useState(null);
-  const [closeError, setCloseError] = useState('');
-  const [modifyError, setModifyError] = useState('');
   const { openOrders, pendingOrders, history } = useSelector((s) => s.orders);
   const { quotes } = useSelector((s) => s.market);
   const { balance } = useSelector((s) => s.account);
 
   const handleClose = async (ticket, symbol, type, lots, openPrice) => {
+    if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.closeOrder(ticket);
+      } catch (err) {
+        dispatch(addLog('error', `Close order failed: ${err.message}`));
+      }
+      return;
+    }
+    const q = quotes[symbol] || {};
+    const closePrice = type === 'BUY' ? q.bid : q.ask;
+    const order = openOrders.find((o) => o.ticket === ticket);
+    const profit = order ? order.profit : 0;
+    const newBalance = parseFloat((balance + profit).toFixed(2));
+    dispatch(closeOrder(ticket));
+    dispatch(updateAccount({ balance: newBalance }));
+    dispatch(
+      addLog('info', `Closed #${ticket} ${type} ${lots} ${symbol} @ ${formatPrice(symbol, closePrice)}, P&L: ${formatProfit(profit)}`)
+    );
     const q = quotes[symbol] || {};
     const closePrice = type === 'BUY' ? q.bid : q.ask;
     const order = openOrders.find((o) => o.ticket === ticket);
@@ -148,11 +164,16 @@ const Positions = () => {
   };
 
   const handleModifySave = async (ticket, sl, tp) => {
-    setModifyError('');
-
     if (backendBridge.isConfigured()) {
       try {
         await backendBridge.modifyOrder(ticket, sl, tp);
+      } catch (err) {
+        dispatch(addLog('error', `Modify order failed: ${err.message}`));
+      }
+      return;
+    }
+    dispatch(modifyOrder(ticket, sl, tp));
+    dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
         dispatch(modifyOrder(ticket, sl, tp));
         dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
         return true;
@@ -176,15 +197,10 @@ const Positions = () => {
       {modifyTarget && (
         <ModifyModal
           order={modifyTarget}
-          onClose={() => { setModifyTarget(null); setModifyError(''); }}
-          onSave={async (ticket, sl, tp) => {
-            const ok = await handleModifySave(ticket, sl, tp);
-            if (ok) setModifyTarget(null);
-          }}
+          onClose={() => setModifyTarget(null)}
+          onSave={handleModifySave}
         />
       )}
-      {closeError && <div className="pos-error">{closeError}</div>}
-      {modifyError && <div className="pos-error">{modifyError}</div>}
       <div className="pos-tabs">
         {TABS.map((t) => (
           <button
@@ -242,8 +258,7 @@ const Positions = () => {
                       <button
                         className="modify-btn"
                         title="Modify SL/TP"
-                        disabled={closingTicket === o.ticket}
-                        onClick={() => { setModifyError(''); setModifyTarget(o); }}
+                        onClick={() => setModifyTarget(o)}
                       >
                         ✎
                       </button>
@@ -252,10 +267,9 @@ const Positions = () => {
                       <button
                         className="close-btn"
                         title="Close position"
-                        disabled={closingTicket === o.ticket}
                         onClick={() => handleClose(o.ticket, o.symbol, o.type, o.lots, o.openPrice)}
                       >
-                        {closingTicket === o.ticket ? '…' : '✕'}
+                        ✕
                       </button>
                     </td>
                   </tr>
@@ -277,12 +291,11 @@ const Positions = () => {
                 <th>SL</th>
                 <th>TP</th>
                 <th>Placed</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {pendingOrders.length === 0 ? (
-                <tr><td colSpan={9} className="empty">No pending orders</td></tr>
+                <tr><td colSpan={8} className="empty">No pending orders</td></tr>
               ) : (
                 pendingOrders.map((o) => (
                   <tr key={o.ticket}>
@@ -294,15 +307,6 @@ const Positions = () => {
                     <td>{o.sl ? formatPrice(o.symbol, o.sl) : '—'}</td>
                     <td>{o.tp ? formatPrice(o.symbol, o.tp) : '—'}</td>
                     <td>{formatDateTime(o.openTime)}</td>
-                    <td>
-                      <button
-                        className="close-btn"
-                        title="Cancel pending order"
-                        onClick={() => handleCancelPending(o.ticket)}
-                      >
-                        ✕
-                      </button>
-                    </td>
                   </tr>
                 ))
               )}

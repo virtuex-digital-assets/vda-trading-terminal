@@ -95,6 +95,33 @@ describe('ordersReducer', () => {
     const s2 = ordersReducer(s1, { type: ADD_HISTORY_ORDER, payload: closed });
     expect(s2.history).toHaveLength(1);
   });
+  it('handles PLACE_ORDER with server-assigned ticket (backend mode)', () => {
+    const order = { symbol: 'EURUSD', type: 'BUY', lots: 0.1, openPrice: 1.085, ticket: 5001 };
+    const state = ordersReducer(initial, { type: PLACE_ORDER, payload: order });
+    expect(state.openOrders[0].ticket).toBe(5001);
+  });
+
+  it('handles SET_ORDERS (bulk replace from backend)', () => {
+    const openOrder   = { ticket: 2001, symbol: 'EURUSD', type: 'BUY', lots: 0.1, openPrice: 1.085, profit: 0 };
+    const pendOrder   = { ticket: 2002, symbol: 'EURUSD', type: 'BUY LIMIT', lots: 0.1, openPrice: 1.080 };
+    const closedOrder = { ticket: 2000, symbol: 'EURUSD', type: 'BUY', lots: 0.1, openPrice: 1.085, closePrice: 1.086, profit: 10 };
+    const state = ordersReducer(initial, {
+      type: SET_ORDERS,
+      payload: { open: [openOrder], pending: [pendOrder], history: [closedOrder] },
+    });
+    expect(state.openOrders).toHaveLength(1);
+    expect(state.openOrders[0].ticket).toBe(2001);
+    expect(state.pendingOrders).toHaveLength(1);
+    expect(state.history).toHaveLength(1);
+    expect(state.history[0].profit).toBe(10);
+  });
+
+  it('handles ADD_HISTORY_ORDER', () => {
+    const closed = { ticket: 3001, symbol: 'GBPUSD', type: 'SELL', lots: 0.5, profit: 25 };
+    const state = ordersReducer(initial, { type: ADD_HISTORY_ORDER, payload: closed });
+    expect(state.history).toHaveLength(1);
+    expect(state.history[0].ticket).toBe(3001);
+  });
 });
 
 describe('accountReducer', () => {

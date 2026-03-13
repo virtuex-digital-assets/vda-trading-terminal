@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { placeOrder, addLog } from '../../store/actions';
-import backendBridge from '../../services/backendBridge';
 import { formatPrice } from '../../utils/formatters';
 import { calculateMargin } from '../../utils/constants';
 import './OrderPanel.css';
@@ -21,8 +20,6 @@ const OrderPanel = () => {
   const [tp, setTp] = useState('');
   const [price, setPrice] = useState('');
   const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
 
   const quote = quotes[activeSymbol] || {};
   const isMarket = orderType === 'BUY' || orderType === 'SELL';
@@ -37,8 +34,6 @@ const OrderPanel = () => {
     : 0;
 
   const canTrade = freeMargin >= requiredMargin && openPrice > 0 && lots > 0;
-  const btnDisabled = !canTrade || submitting;
-  const btnClass = (side) => `op-btn ${side}${btnDisabled ? ' disabled' : ''}`;
 
   const submitOrder = async (type) => {
     const isBuyType = type.startsWith('BUY');
@@ -68,6 +63,20 @@ const OrderPanel = () => {
     };
 
     if (backendBridge.isConfigured()) {
+      try {
+        await backendBridge.placeOrder(order);
+      } catch (err) {
+        dispatch(addLog('error', `Order failed: ${err.message}`));
+        return;
+      }
+    } else {
+      dispatch(placeOrder(order));
+      dispatch(
+        addLog(
+          'info',
+          `Order placed: ${type} ${lots} ${activeSymbol} @ ${formatPrice(activeSymbol, execPrice)}`
+        )
+      );
       // ── Live backend mode ───────────────────────────────────────────────
       setSubmitError('');
       setSubmitting(true);
@@ -214,32 +223,22 @@ const OrderPanel = () => {
 
         <div className="op-actions">
           <button
-            className={btnClass('buy')}
+            className={`op-btn buy${!canTrade ? ' disabled' : ''}`}
             onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
-            disabled={btnDisabled}
-            className={`op-btn buy${(!canTrade || submitting) ? ' disabled' : ''}`}
-            onClick={() => submitOrder(isMarket ? 'BUY' : orderType)}
-            disabled={!canTrade || submitting}
+            disabled={!canTrade}
           >
-            {submitting ? '…' : '▲ BUY'}
+            ▲ BUY
           </button>
           <button
-            className={btnClass('sell')}
+            className={`op-btn sell${!canTrade ? ' disabled' : ''}`}
             onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
-            disabled={btnDisabled}
-            className={`op-btn sell${(!canTrade || submitting) ? ' disabled' : ''}`}
-            onClick={() => submitOrder(isMarket ? 'SELL' : orderType)}
-            disabled={!canTrade || submitting}
+            disabled={!canTrade}
           >
-            {submitting ? '…' : '▼ SELL'}
+            ▼ SELL
           </button>
         </div>
-        {submitting && <div className="op-warn">Sending order…</div>}
-        {!canTrade && !submitting && openPrice > 0 && (
+        {!canTrade && openPrice > 0 && (
           <div className="op-warn">Insufficient margin</div>
-        )}
-        {submitError && (
-          <div className="op-warn">{submitError}</div>
         )}
       </div>
     </div>
