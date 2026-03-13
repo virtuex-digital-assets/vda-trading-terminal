@@ -3,14 +3,16 @@ import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
 
-import MarketWatch from './components/MarketWatch/MarketWatch';
-import Chart from './components/Chart/Chart';
-import OrderPanel from './components/OrderPanel/OrderPanel';
-import Positions from './components/Positions/Positions';
-import AccountInfo from './components/AccountInfo/AccountInfo';
-import Terminal from './components/Terminal/Terminal';
-import CRMView from './components/CRM/CRMView';
-import MarketFeed from './components/MarketFeed/MarketFeed';
+import MarketWatch    from './components/MarketWatch/MarketWatch';
+import Chart          from './components/Chart/Chart';
+import OrderPanel     from './components/OrderPanel/OrderPanel';
+import Positions      from './components/Positions/Positions';
+import AccountInfo    from './components/AccountInfo/AccountInfo';
+import Terminal       from './components/Terminal/Terminal';
+import CRMView        from './components/CRM/CRMView';
+import MarketFeed     from './components/MarketFeed/MarketFeed';
+import BrokerMonitor  from './components/BrokerMonitor/BrokerMonitor';
+import Login          from './components/Login/Login';
 
 import './components/shared.css';
 import './App.css';
@@ -18,7 +20,10 @@ import './App.css';
 const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
 
 const AppInner = () => {
-  const [appMode, setAppMode] = useState('terminal'); // 'terminal' | 'crm' | 'feed'
+  // 'terminal' | 'crm' | 'feed' | 'broker'
+  const [appMode,    setAppMode]    = useState('terminal');
+  const [userRole,   setUserRole]   = useState(null);   // null = not logged in
+  const [showLogin,  setShowLogin]  = useState(false);
 
   useEffect(() => {
     if (MT4_BRIDGE_URL) {
@@ -29,14 +34,35 @@ const AppInner = () => {
     return () => mt4Bridge.disconnect();
   }, []);
 
+  const handleLogin = (role) => {
+    setUserRole(role);
+    setShowLogin(false);
+    if (role === 'admin') setAppMode('broker');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('vda_token');
+    localStorage.removeItem('vda_user');
+    setUserRole(null);
+    setAppMode('terminal');
+  };
+
+  const modeLabel = {
+    terminal: 'Trading Terminal · MetaTrader 4 Bridge',
+    crm:      'CRM System',
+    feed:     'Market Feed',
+    broker:   'Broker Risk Monitor',
+  };
+
   return (
     <div className="terminal-root">
+      {/* ── Login overlay ───────────────────────────────────────────── */}
+      {showLogin && <Login onLogin={handleLogin} />}
+
       {/* ── Top bar ──────────────────────────────────────────────────── */}
       <header className="top-bar">
         <span className="logo">VDA</span>
-        <span className="logo-sub">
-          {appMode === 'crm' ? 'CRM System' : appMode === 'feed' ? 'Market Feed' : 'Trading Terminal · MetaTrader 4 Bridge'}
-        </span>
+        <span className="logo-sub">{modeLabel[appMode] || modeLabel.terminal}</span>
 
         {/* App mode toggle */}
         <div className="app-mode-nav">
@@ -44,7 +70,7 @@ const AppInner = () => {
             className={`mode-btn${appMode === 'terminal' ? ' mode-active' : ''}`}
             onClick={() => setAppMode('terminal')}
           >
-            📈 Trading Terminal
+            📈 Terminal
           </button>
           <button
             className={`mode-btn${appMode === 'crm' ? ' mode-active' : ''}`}
@@ -56,7 +82,14 @@ const AppInner = () => {
             className={`mode-btn${appMode === 'feed' ? ' mode-active' : ''}`}
             onClick={() => setAppMode('feed')}
           >
-            🎬 Market Feed
+            🎬 Feed
+          </button>
+          <button
+            className={`mode-btn${appMode === 'broker' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('broker')}
+            title="Broker Risk Monitor"
+          >
+            🛡 Broker
           </button>
         </div>
 
@@ -70,14 +103,30 @@ const AppInner = () => {
               ↺ Reset Demo
             </button>
           )}
+          {userRole ? (
+            <button className="top-btn" onClick={handleLogout} title="Log out">
+              {userRole === 'admin' ? '👑' : '👤'} Logout
+            </button>
+          ) : (
+            <button className="top-btn" onClick={() => setShowLogin(true)}>
+              🔑 Login
+            </button>
+          )}
         </div>
       </header>
 
       {/* ── CRM view ─────────────────────────────────────────────────── */}
       {appMode === 'crm' && <CRMView />}
 
-      {/* ── Market Feed (TikTok-style) ───────────────────────────────────── */}
+      {/* ── Market Feed ──────────────────────────────────────────────── */}
       {appMode === 'feed' && <MarketFeed />}
+
+      {/* ── Broker risk monitor ──────────────────────────────────────── */}
+      {appMode === 'broker' && (
+        <div className="broker-view">
+          <BrokerMonitor />
+        </div>
+      )}
 
       {/* ── Trading terminal layout ───────────────────────────────────── */}
       {appMode === 'terminal' && (
