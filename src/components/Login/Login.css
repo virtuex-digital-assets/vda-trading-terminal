@@ -146,8 +146,10 @@
 }
 
 .login-demo-btn:hover       { border-color: #5566ff; color: #aabbee; }
-.login-demo-btn.admin       { color: #ff9800; border-color: rgba(255,152,0,0.3); }
-.login-demo-btn.admin:hover { border-color: #ff9800; }
+.login-demo-btn.admin             { color: #ff9800; border-color: rgba(255,152,0,0.3); }
+.login-demo-btn.admin:hover       { border-color: #ff9800; }
+.login-demo-btn.superadmin        { color: #e0c040; border-color: rgba(224,192,64,0.3); }
+.login-demo-btn.superadmin:hover  { border-color: #e0c040; }
 
 /* Hint */
 .login-hint {

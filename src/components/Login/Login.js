@@ -11,7 +11,7 @@ import './Login.css';
  * /api/auth/login endpoint and stores the returned JWT in localStorage.
  *
  * Props:
- *   onLogin(role)  – called after successful authentication ('admin'|'trader')
+ *   onLogin(role)  – called after successful authentication ('super_admin'|'admin'|'trader')
  */
 const API_URL = process.env.REACT_APP_API_URL || '';
 
@@ -28,12 +28,21 @@ const Login = ({ onLogin }) => {
     setLoading(true);
 
     // ── Demo (no backend) mode ────────────────────────────────────────────
+    // NOTE: Role detection from email is intentionally simple for demo/offline
+    // mode only. Production must validate roles server-side via JWT claims and
+    // NEVER trust client-supplied role data.
     if (isDemo) {
       setTimeout(() => {
         setLoading(false);
-        // Admin shortcut
-        if (email.toLowerCase().includes('admin')) onLogin('admin');
-        else                                         onLogin('trader');
+        // Role detection from email prefix
+        const e = email.toLowerCase();
+        if (e.includes('superadmin') || e.includes('super_admin') || e.includes('root')) {
+          onLogin('super_admin');
+        } else if (e.includes('admin')) {
+          onLogin('admin');
+        } else {
+          onLogin('trader');
+        }
       }, 400);
       return;
     }
@@ -62,8 +71,9 @@ const Login = ({ onLogin }) => {
   };
 
   const fillDemo = (role) => {
-    if (role === 'admin') { setEmail('admin@vda.trade'); setPassword('Admin1234!'); }
-    else                  { setEmail('demo@vda.trade');  setPassword('Demo1234!'); }
+    if (role === 'super_admin') { setEmail('superadmin@vda.trade'); setPassword('SuperAdmin1!'); }
+    else if (role === 'admin')  { setEmail('admin@vda.trade');      setPassword('Admin1234!'); }
+    else                        { setEmail('demo@vda.trade');        setPassword('Demo1234!'); }
   };
 
   return (
@@ -124,6 +134,7 @@ const Login = ({ onLogin }) => {
           <span className="login-demo-label">Quick login:</span>
           <button className="login-demo-btn" onClick={() => fillDemo('trader')}>Demo Trader</button>
           <button className="login-demo-btn admin" onClick={() => fillDemo('admin')}>Demo Admin</button>
+          <button className="login-demo-btn superadmin" onClick={() => fillDemo('super_admin')}>Super Admin</button>
         </div>
 
         <p className="login-hint">
