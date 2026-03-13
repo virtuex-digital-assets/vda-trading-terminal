@@ -1,0 +1,394 @@
+/* ── MarketFeed — TikTok-style trading feed ──────────────────────────────── */
+
+/* Wrapper fills the area below the top-bar */
+.market-feed-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: #000;
+}
+
+/* ── Scroll container ────────────────────────────────────────────────────── */
+
+.feed-scroll-container {
+  flex: 1;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;         /* Firefox */
+}
+
+.feed-scroll-container::-webkit-scrollbar {
+  display: none;                 /* Chrome / Safari */
+}
+
+/* ── Individual card ─────────────────────────────────────────────────────── */
+
+.feed-card {
+  scroll-snap-align: start;
+  height: 100%;                  /* exact viewport height thanks to snap */
+  width: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 20px 72px 0 24px;    /* right padding leaves room for action bar */
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: opacity 0.3s;
+}
+
+/* Subtle background glow blob */
+.feed-card-glow {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  top: -80px;
+  right: -80px;
+  opacity: 0.12;
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+/* ── Content area ────────────────────────────────────────────────────────── */
+
+.feed-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 12px;
+  z-index: 1;
+}
+
+.feed-signal-badge {
+  display: inline-block;
+  border: 1px solid;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 12px;
+  margin-bottom: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  width: fit-content;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.feed-symbol-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.feed-symbol {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+
+.feed-direction-tag {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+}
+
+.feed-direction-tag--buy  { background: #27ae60; color: #fff; }
+.feed-direction-tag--sell { background: #e74c3c; color: #fff; }
+
+.feed-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.feed-price {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-change {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.feed-change.positive { color: #2ecc71; }
+.feed-change.negative { color: #e74c3c; }
+
+/* ── Sparkline ───────────────────────────────────────────────────────────── */
+
+.feed-chart {
+  margin-bottom: 12px;
+}
+
+.sparkline-svg {
+  display: block;
+}
+
+/* ── Description + tags ──────────────────────────────────────────────────── */
+
+.feed-description {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0 0 10px;
+  max-height: 72px;
+  overflow: hidden;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.feed-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.feed-tag {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Right action bar ────────────────────────────────────────────────────── */
+
+.feed-actions {
+  position: absolute;
+  right: 10px;
+  bottom: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  z-index: 2;
+}
+
+.feed-action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.feed-action-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, background 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.feed-action-btn:hover  { transform: scale(1.15); background: rgba(255,255,255,0.22); }
+.feed-action-btn.liked  { animation: likePoP 0.3s ease; }
+.feed-action-btn.saved  { animation: likePoP 0.3s ease; }
+
+@keyframes likePoP {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+.feed-action-count {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.8);
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+/* ── Bottom row: analyst + trade button ──────────────────────────────────── */
+
+.feed-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 14px;
+  z-index: 2;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  margin-top: 4px;
+}
+
+.feed-analyst {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feed-analyst-avatar {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.feed-analyst-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.feed-analyst-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.feed-analyst-time {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+}
+
+.feed-trade-btn {
+  border: none;
+  border-radius: 22px;
+  padding: 9px 22px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: opacity 0.15s, transform 0.15s;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+
+.feed-trade-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+/* ── Comment overlay ─────────────────────────────────────────────────────── */
+
+.feed-comment-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 10;
+}
+
+.feed-comment-input {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 20px;
+  color: #fff;
+  padding: 8px 16px;
+  font-size: 13px;
+  outline: none;
+}
+
+.feed-comment-input::placeholder {
+  color: rgba(255,255,255,0.45);
+}
+
+.feed-comment-send {
+  background: none;
+  border: none;
+  color: #4fc3f7;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+/* ── Progress dots (left side) ───────────────────────────────────────────── */
+
+.feed-progress-dots {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 10;
+}
+
+.feed-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.3);
+  border: none;
+  cursor: pointer;
+  transition: height 0.2s, background 0.2s;
+  padding: 0;
+}
+
+.feed-dot--active {
+  height: 16px;
+  background: #fff;
+}
+
+/* ── Bottom navigation bar ───────────────────────────────────────────────── */
+
+.feed-bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 6px 0 8px;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.feed-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,0.45);
+  padding: 4px 14px;
+  transition: color 0.15s;
+}
+
+.feed-nav-btn--active { color: #fff; }
+
+.feed-nav-icon { font-size: 20px; line-height: 1; }
+
+.feed-nav-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Responsive: narrow viewport ─────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .feed-card {
+    padding: 16px 64px 0 16px;
+  }
+
+  .feed-symbol { font-size: 22px; }
+  .feed-price  { font-size: 18px; }
+
+  .feed-actions {
+    right: 6px;
+    gap: 14px;
+  }
+}

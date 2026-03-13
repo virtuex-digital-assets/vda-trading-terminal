@@ -1,0 +1,191 @@
+// Action types
+export const PLACE_ORDER    = 'PLACE_ORDER';
+export const UPDATE_PRICES  = 'UPDATE_PRICES';
+export const SET_MARKET_ERROR = 'SET_MARKET_ERROR';
+export const SET_MARKET_LOADING = 'SET_MARKET_LOADING';
+
+// Action creators
+export const placeOrder = (order) => ({ type: PLACE_ORDER, payload: order });
+
+export const updatePrices = (prices) => ({ type: UPDATE_PRICES, payload: prices });
+
+export const setMarketError = (error) => ({ type: SET_MARKET_ERROR, payload: error });
+
+export const setMarketLoading = (loading) => ({ type: SET_MARKET_LOADING, payload: loading });
+import {
+  UPDATE_QUOTE,
+  SET_ACTIVE_SYMBOL,
+  ADD_CANDLE,
+  SET_CANDLES,
+  SET_TIMEFRAME,
+  PLACE_ORDER,
+  CLOSE_ORDER,
+  MODIFY_ORDER,
+  UPDATE_ORDER_PROFIT,
+  CANCEL_PENDING_ORDER,
+  SET_ORDERS,
+  ADD_HISTORY_ORDER,
+  UPDATE_ACCOUNT,
+  SET_LEVERAGE,
+  SET_CONNECTION_STATUS,
+  ADD_LOG,
+  CLEAR_LOG,
+  CRM_SET_VIEW,
+  CRM_SELECT_CLIENT,
+  CRM_ADD_CLIENT,
+  CRM_UPDATE_CLIENT,
+  CRM_SET_SEARCH,
+  CRM_SET_STAGE_FILTER,
+  CRM_ADD_NOTE,
+  CRM_ADD_TRANSACTION,
+  CRM_DELETE_CLIENT,
+  CRM_SET_REP_FILTER,
+  CRM_IMPORT_CLIENTS,
+} from './actionTypes';
+
+// ── Market data actions ────────────────────────────────────────────────────
+export const updateQuote = (symbol, bid, ask, time) => ({
+  type: UPDATE_QUOTE,
+  payload: { symbol, bid, ask, time },
+});
+
+export const setActiveSymbol = (symbol) => ({
+  type: SET_ACTIVE_SYMBOL,
+  payload: symbol,
+});
+
+export const setCandles = (symbol, timeframe, candles) => ({
+  type: SET_CANDLES,
+  payload: { symbol, timeframe, candles },
+});
+
+export const addCandle = (symbol, timeframe, candle) => ({
+  type: ADD_CANDLE,
+  payload: { symbol, timeframe, candle },
+});
+
+export const setTimeframe = (timeframe) => ({
+  type: SET_TIMEFRAME,
+  payload: timeframe,
+});
+
+// ── Order actions ──────────────────────────────────────────────────────────
+export const placeOrder = (order) => ({
+  type: PLACE_ORDER,
+  payload: order,
+});
+
+export const closeOrder = (ticket) => ({
+  type: CLOSE_ORDER,
+  payload: ticket,
+});
+
+export const modifyOrder = (ticket, sl, tp) => ({
+  type: MODIFY_ORDER,
+  payload: { ticket, sl, tp },
+});
+
+export const updateOrderProfit = (ticket, profit) => ({
+  type: UPDATE_ORDER_PROFIT,
+  payload: { ticket, profit },
+});
+
+// ── Account actions ────────────────────────────────────────────────────────
+export const updateAccount = (accountData) => ({
+  type: UPDATE_ACCOUNT,
+  payload: accountData,
+});
+
+export const setLeverage = (leverage) => ({
+  type: SET_LEVERAGE,
+  payload: leverage,
+});
+
+// ── Connection actions ─────────────────────────────────────────────────────
+export const setConnectionStatus = (status) => ({
+  type: SET_CONNECTION_STATUS,
+  payload: status,
+});
+
+// ── Terminal log actions ───────────────────────────────────────────────────
+export const addLog = (level, message) => ({
+  type: ADD_LOG,
+  payload: { level, message, time: new Date().toISOString() },
+});
+
+export const clearLog = () => ({ type: CLEAR_LOG });
+
+export const cancelPendingOrder = (ticket) => ({
+  type: CANCEL_PENDING_ORDER,
+  payload: ticket,
+});
+
+/**
+ * Replace the entire orders state with data loaded from the backend.
+ * @param {object[]} open     - open market orders
+ * @param {object[]} pending  - pending limit/stop orders
+ * @param {object[]} history  - closed order history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: { open, pending, history },
+});
+
+/**
+ * Add a single closed order to history (e.g. from a backend WebSocket event).
+// ── Backend order sync actions ────────────────────────────────────────────
+/** Replace all orders from the backend (used after login or full refresh). */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: { open, pending, history },
+});
+
+/** Add a single closed order to history (e.g. from WS broadcast). */
+/**
+ * Bulk-replace the orders state from the backend (used on login / reconnect).
+ * @param {{ open: object[], pending: object[], history: object[] }} orders
+ */
+export const setOrders = (orders) => ({
+  type: SET_ORDERS,
+  payload: orders,
+});
+
+/**
+ * Prepend a single closed order to trade history (used after REST close).
+ * @param {object} order
+ * Replace all orders in the store with data loaded from the backend.
+ * @param {object[]} [open]     Open market orders
+ * @param {object[]} [pending]  Pending limit/stop orders
+ * @param {object[]} [history]  Closed trade history
+ */
+export const setOrders = (open, pending, history) => ({
+  type: SET_ORDERS,
+  payload: {
+    ...(open    !== undefined && { open }),
+    ...(pending !== undefined && { pending }),
+    ...(history !== undefined && { history }),
+  },
+});
+
+/**
+ * Prepend a single closed order to the history array (deduplicates by ticket).
+ * @param {object} order  Closed order object from the backend
+ */
+export const addHistoryOrder = (order) => ({
+  type: ADD_HISTORY_ORDER,
+  payload: order,
+});
+
+// ── CRM actions ────────────────────────────────────────────────────────────
+
+export const crmSetView = (view) => ({ type: CRM_SET_VIEW, payload: view });
+export const crmSelectClient = (id) => ({ type: CRM_SELECT_CLIENT, payload: id });
+export const crmAddClient = (data) => ({ type: CRM_ADD_CLIENT, payload: data });
+export const crmUpdateClient = (id, changes) => ({ type: CRM_UPDATE_CLIENT, payload: { id, changes } });
+export const crmSetSearch = (query) => ({ type: CRM_SET_SEARCH, payload: query });
+export const crmSetStageFilter = (stage) => ({ type: CRM_SET_STAGE_FILTER, payload: stage });
+export const crmAddNote = (clientId, text, author) => ({ type: CRM_ADD_NOTE, payload: { clientId, text, author } });
+export const crmAddTransaction = (clientId, txType, amount) => ({ type: CRM_ADD_TRANSACTION, payload: { clientId, txType, amount } });
+export const crmDeleteClient = (id) => ({ type: CRM_DELETE_CLIENT, payload: id });
+export const crmSetRepFilter = (rep) => ({ type: CRM_SET_REP_FILTER, payload: rep });
+export const crmImportClients = (clients) => ({ type: CRM_IMPORT_CLIENTS, payload: clients });

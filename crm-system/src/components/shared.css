@@ -1,0 +1,16 @@
+/* ── Shared panel styles ─────────────────────────────────────────────────── */
+
+.panel-header {
+  background: #0f3460;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c8d0e0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #2a2a4a;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  user-select: none;
+}
