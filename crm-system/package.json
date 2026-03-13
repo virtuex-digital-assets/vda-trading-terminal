@@ -7,7 +7,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
-    "test": "react-scripts test --passWithNoTests",
+    "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
   "dependencies": {
