@@ -1,0 +1,54 @@
+.terminal-panel {
+  background: #10101e;
+  border-top: 1px solid #2a2a4a;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.terminal-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 8px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.log-entry {
+  display: flex;
+  gap: 6px;
+  padding: 1px 0;
+  border-bottom: 1px solid #1a1a2e;
+}
+
+.log-time { color: #445566; min-width: 75px; }
+.log-level { min-width: 52px; font-weight: 600; }
+.log-msg { color: #c8d0e0; }
+
+.log-info .log-level { color: #4fc3f7; }
+.log-warn .log-level { color: #ffcc44; }
+.log-error .log-level { color: #ef5350; }
+.log-debug .log-level { color: #8899bb; }
+
+.log-empty {
+  color: #445566;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.clear-btn {
+  background: transparent;
+  border: 1px solid #2a2a4a;
+  color: #5566aa;
+  padding: 1px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 2px;
+  margin-left: auto;
+}
+
+.clear-btn:hover {
+  border-color: #4488cc;
+  color: #c8d0e0;
+}

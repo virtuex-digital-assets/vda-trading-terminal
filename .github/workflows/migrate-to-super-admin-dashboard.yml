@@ -1,0 +1,74 @@
+# Migrate full platform codebase to VDA-super-admin-dashboard
+#
+# BEFORE RUNNING THIS WORKFLOW:
+#   1. Create a GitHub Personal Access Token (PAT) with `repo` scope
+#      that has write access to the destination repository.
+#   2. Add it as a repository secret named `MIGRATION_PAT` in this repo:
+#      Settings → Secrets and variables → Actions → New repository secret
+#
+# HOW TO RUN:
+#   GitHub UI → Actions → "Migrate codebase to VDA-super-admin-dashboard" → Run workflow
+
+name: Migrate codebase to VDA-super-admin-dashboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source (vda-trading-terminal)
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout destination (VDA-super-admin-dashboard)
+        uses: actions/checkout@v4
+        with:
+          repository: virtuex-digital-assets/VDA-super-admin-dashboard
+          token: ${{ secrets.MIGRATION_PAT }}
+          path: destination
+
+      - name: Copy source files to destination
+        run: |
+          rsync -av \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='build' \
+            --exclude='.cache' \
+            source/ destination/
+
+      - name: Verify key folders were copied
+        run: |
+          echo "=== Destination root contents ==="
+          ls destination/
+          for dir in backend src crm-system database docker; do
+            if [ -d "destination/$dir" ]; then
+              echo "✓ $dir"
+            else
+              echo "- $dir (not present in source)"
+            fi
+          done
+
+      - name: Commit and push to VDA-super-admin-dashboard
+        id: push
+        working-directory: destination
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit — destination is already up to date."
+            echo "migration_performed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Migrated full platform codebase from vda-trading-terminal repository"
+            git push
+            echo "migration_performed=true" >> "$GITHUB_OUTPUT"
+            echo "Migration complete."
+          fi

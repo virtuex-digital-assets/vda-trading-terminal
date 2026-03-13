@@ -1,0 +1,57 @@
+/* ── CRM App root ─────────────────────────────────────────────────────────── */
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.crm-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #0d1b2a;
+  color: #c8d0e0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ── Top header bar ───────────────────────────────────────────────────────── */
+
+.crm-app-header {
+  background: #0a1628;
+  border-bottom: 2px solid #1e2a4a;
+  padding: 0 20px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.crm-app-logo {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.crm-app-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #c8d0e0;
+  letter-spacing: 0.02em;
+}
+
+.crm-app-subtitle {
+  font-size: 11px;
+  color: #3a4a6a;
+  margin-left: 2px;
+}
+
+/* ── Main content area ────────────────────────────────────────────────────── */
+
+.crm-app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
