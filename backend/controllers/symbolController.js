@@ -107,15 +107,44 @@ function createSymbol(req, res) {
     return res.status(409).json({ error: `Symbol ${symbol} already exists` });
   }
 
+  // Use nullish coalescing so that 0 is treated as a valid value, not "missing"
+  const spreadRaw       = req.body.spread ?? 0.0001;
+  const leverageCapRaw  = req.body.leverageCap ?? 500;
+  const contractSizeRaw = req.body.contractSize ?? 100000;
+  const pipSizeRaw      = req.body.pipSize ?? 0.0001;
+  const digitsRaw       = req.body.digits ?? 5;
+
+  const spread       = parseFloat(spreadRaw);
+  const leverageCap  = parseInt(leverageCapRaw, 10);
+  const contractSize = parseInt(contractSizeRaw, 10);
+  const pipSize      = parseFloat(pipSizeRaw);
+  const digits       = parseInt(digitsRaw, 10);
+
+  if (Number.isNaN(spread) || spread < 0) {
+    return res.status(400).json({ error: 'Invalid spread: must be a number >= 0' });
+  }
+  if (Number.isNaN(leverageCap) || leverageCap < 1) {
+    return res.status(400).json({ error: 'Invalid leverageCap: must be an integer >= 1' });
+  }
+  if (Number.isNaN(contractSize) || contractSize <= 0) {
+    return res.status(400).json({ error: 'Invalid contractSize: must be an integer > 0' });
+  }
+  if (Number.isNaN(pipSize) || pipSize <= 0) {
+    return res.status(400).json({ error: 'Invalid pipSize: must be a number > 0' });
+  }
+  if (Number.isNaN(digits) || digits < 0) {
+    return res.status(400).json({ error: 'Invalid digits: must be an integer >= 0' });
+  }
+
   const cfg = {
     symbol,
-    description:  req.body.description  || symbol,
-    spread:       parseFloat(req.body.spread      || 0.0001),
-    leverageCap:  parseInt(req.body.leverageCap   || 500, 10),
-    contractSize: parseInt(req.body.contractSize  || 100000, 10),
-    pipSize:      parseFloat(req.body.pipSize     || 0.0001),
-    digits:       parseInt(req.body.digits        || 5, 10),
-    currency:     req.body.currency  || 'USD',
+    description:  req.body.description || symbol,
+    spread,
+    leverageCap,
+    contractSize,
+    pipSize,
+    digits,
+    currency:     req.body.currency || 'USD',
     tradingHours: req.body.tradingHours || '00:00-24:00',
     active:       req.body.active !== undefined ? Boolean(req.body.active) : true,
   };
