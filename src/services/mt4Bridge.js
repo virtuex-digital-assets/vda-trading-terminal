@@ -322,11 +322,9 @@ class MT4Bridge {
         this._handleOrderMessage(msg);
         break;
       case 'orders':
-        // Full orders snapshot sent after authentication
         store.dispatch(setOrders(msg.open || [], msg.pending || [], msg.history || []));
         break;
       case 'risk':
-        // Broker risk data – handled by BrokerMonitor via Redux if needed
         break;
       default:
         store.dispatch(addLog('debug', `Unknown bridge message type: ${msg.type}`));

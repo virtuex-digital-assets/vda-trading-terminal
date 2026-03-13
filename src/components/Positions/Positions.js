@@ -103,7 +103,6 @@ const Positions = () => {
     setClosingTicket(ticket);
 
     if (backendBridge.isConfigured()) {
-      // ── Live backend mode ───────────────────────────────────────────────
       try {
         const closed = await backendBridge.closeOrder(ticket);
         dispatch(closeOrder(ticket));
@@ -123,7 +122,6 @@ const Positions = () => {
         setClosingTicket(null);
       }
     } else {
-      // ── Demo / simulator mode ────────────────────────────────────────────
       const newBalance = parseFloat((balance + profit).toFixed(2));
       dispatch(closeOrder(ticket));
       dispatch(updateAccount({ balance: newBalance }));
@@ -153,7 +151,6 @@ const Positions = () => {
     setModifyError('');
 
     if (backendBridge.isConfigured()) {
-      // ── Live backend mode ───────────────────────────────────────────────
       try {
         await backendBridge.modifyOrder(ticket, sl, tp);
         dispatch(modifyOrder(ticket, sl, tp));
@@ -166,7 +163,6 @@ const Positions = () => {
         return false;
       }
     } else {
-      // ── Demo / simulator mode ────────────────────────────────────────────
       dispatch(modifyOrder(ticket, sl, tp));
       dispatch(addLog('info', `Modified #${ticket}: SL=${sl || '—'}, TP=${tp || '—'}`));
       return true;

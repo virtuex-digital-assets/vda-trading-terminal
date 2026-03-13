@@ -3,7 +3,6 @@ import { Provider } from 'react-redux';
 import store from './store';
 import mt4Bridge from './services/mt4Bridge';
 import backendBridge from './services/backendBridge';
-import { updateAccount, setOrders, addLog } from './store/actions';
 
 import MarketWatch    from './components/MarketWatch/MarketWatch';
 import Chart          from './components/Chart/Chart';
@@ -68,7 +67,6 @@ const AppInner = () => {
           else if (data.user.role === 'admin')  setAppMode('broker');
         })
         .catch(() => {
-          // Token is invalid / expired – clear storage
           localStorage.removeItem('vda_token');
           localStorage.removeItem('vda_user');
         });
@@ -88,10 +86,11 @@ const AppInner = () => {
     if (role === 'super_admin') setAppMode('superadmin');
     else if (role === 'admin')  setAppMode('broker');
 
-    // When a real backend token is available, initialise the bridge.
+    if (role === 'super_admin') setAppMode('superadmin');
+    else if (role === 'admin')  setAppMode('broker');
+
     if (token && backendBridge.isConfigured()) {
       backendBridge.setToken(token);
-      // Stop the local simulator if it was running
       mt4Bridge.stopSimulator();
 
       // Load initial account state from REST
@@ -223,7 +222,7 @@ const AppInner = () => {
         </div>
       )}
 
-      {/* ── Super Admin panel ─────────────────────────────────────────── */}
+      {/* ── Super Admin panel ─────────────────────────────────────── */}
       {appMode === 'superadmin' && (
         <div className="broker-view">
           <SuperAdmin />
