@@ -40,10 +40,10 @@ html, body, #root {
   letter-spacing: 0.02em;
 }
 
-.crm-app-subtitle {
-  font-size: 11px;
+.crm-app-version {
+  font-size: 10px;
   color: #3a4a6a;
-  margin-left: 2px;
+  margin-left: 4px;
 }
 
 /* ── Main content area ────────────────────────────────────────────────────── */
