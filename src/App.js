@@ -16,10 +16,10 @@ import MarketFeed     from './components/MarketFeed/MarketFeed';
 import BrokerMonitor  from './components/BrokerMonitor/BrokerMonitor';
 import SuperAdmin     from './components/SuperAdmin/SuperAdmin';
 import Login          from './components/Login/Login';
-import Finance        from './components/Finance/Finance';
-import Documents      from './components/Documents/Documents';
-import Chat           from './components/Chat/Chat';
-import Settings       from './components/Settings/Settings';
+import CopyTrading    from './components/CopyTrading/CopyTrading';
+import KYC            from './components/KYC/KYC';
+import Tickets        from './components/Tickets/Tickets';
+import Affiliates     from './components/Affiliates/Affiliates';
 
 import './components/shared.css';
 import './App.css';
@@ -28,7 +28,7 @@ const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
 const API_URL        = process.env.REACT_APP_API_URL        || '';
 
 const AppInner = () => {
-  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin' | 'finance' | 'documents' | 'chat' | 'settings'
+  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin' | 'copytrading' | 'kyc' | 'tickets' | 'affiliates'
   const [appMode,   setAppMode]   = useState('terminal');
   const [userRole,  setUserRole]  = useState(null);   // null = not logged in
   const [showLogin, setShowLogin] = useState(false);
@@ -134,15 +134,15 @@ const AppInner = () => {
   };
 
   const modeLabel = {
-    terminal:   'Trading Terminal · MetaTrader 4 Bridge',
-    crm:        'CRM System',
-    feed:       'Market Feed',
-    broker:     'Broker Risk Monitor',
-    superadmin: 'Super Admin Control Panel',
-    finance:    'Finance & Payments',
-    documents:  'Documents & KYC',
-    chat:       'Messaging',
-    settings:   'Platform Settings',
+    terminal:    'Trading Terminal · MetaTrader 4 Bridge',
+    crm:         'CRM System',
+    feed:        'Market Feed',
+    broker:      'Broker Risk Monitor',
+    superadmin:  'Super Admin Control Panel',
+    copytrading: 'Copy Trading',
+    kyc:         'KYC Verification',
+    tickets:     'Support Tickets',
+    affiliates:  'Affiliate / IB Partner',
   };
 
   return (
@@ -210,6 +210,27 @@ const AppInner = () => {
           >
             ⚙️ Settings
           </button>
+          <button
+            className={`mode-btn${appMode === 'kyc' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('kyc')}
+            title="KYC Verification"
+          >
+            🪪 KYC
+          </button>
+          <button
+            className={`mode-btn${appMode === 'tickets' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('tickets')}
+            title="Support Tickets"
+          >
+            🎫 Support
+          </button>
+          <button
+            className={`mode-btn${appMode === 'affiliates' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('affiliates')}
+            title="Affiliate / IB Partner"
+          >
+            🤝 Affiliate
+          </button>
           {userRole === 'super_admin' && (
             <button
               className={`mode-btn${appMode === 'superadmin' ? ' mode-active' : ''}`}
@@ -253,6 +274,27 @@ const AppInner = () => {
       {appMode === 'copytrading' && (
         <div className="broker-view">
           <CopyTrading />
+        </div>
+      )}
+
+      {/* ── KYC Verification ──────────────────────────────────────────── */}
+      {appMode === 'kyc' && (
+        <div className="broker-view">
+          <KYC />
+        </div>
+      )}
+
+      {/* ── Support Tickets ───────────────────────────────────────────── */}
+      {appMode === 'tickets' && (
+        <div className="broker-view">
+          <Tickets />
+        </div>
+      )}
+
+      {/* ── Affiliate / IB Partner ────────────────────────────────────── */}
+      {appMode === 'affiliates' && (
+        <div className="broker-view">
+          <Affiliates />
         </div>
       )}
 

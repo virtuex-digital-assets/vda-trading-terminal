@@ -396,14 +396,272 @@ CREATE TABLE platform_settings (
     updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
--- ── Audit Logs ───────────────────────────────────────────────────────────
-CREATE TABLE audit_logs (
-    id           BIGSERIAL    PRIMARY KEY,
-    user_id      UUID         REFERENCES users(id),
-    action       VARCHAR(255) NOT NULL,
-    resource     VARCHAR(100),
-    resource_id  VARCHAR(100),
-    details      JSONB,
-    ip_address   INET,
+CREATE TRIGGER copy_strategies_updated_at
+    BEFORE UPDATE ON copy_strategies
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- KYC (Know Your Customer) System
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS kyc_profiles (
+    user_id          UUID         PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    broker_id        UUID         REFERENCES brokers(id) ON DELETE SET NULL,
+    level            SMALLINT     NOT NULL DEFAULT 0 CHECK (level BETWEEN 0 AND 3),
+    status           VARCHAR(20)  NOT NULL DEFAULT 'not_submitted'
+                         CHECK (status IN ('not_submitted','pending','approved','rejected')),
+    submitted_at     TIMESTAMPTZ,
+    reviewed_at      TIMESTAMPTZ,
+    reviewed_by      UUID         REFERENCES users(id) ON DELETE SET NULL,
+    rejection_reason TEXT,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_kyc_profiles_broker  ON kyc_profiles (broker_id);
+CREATE INDEX IF NOT EXISTS idx_kyc_profiles_status  ON kyc_profiles (status);
+
+CREATE TABLE IF NOT EXISTS kyc_documents (
+    id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id          UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    broker_id        UUID         REFERENCES brokers(id) ON DELETE SET NULL,
+    type             VARCHAR(30)  NOT NULL
+                         CHECK (type IN ('passport','national_id','drivers_license',
+                                         'utility_bill','bank_statement','selfie',
+                                         'corporate_registration')),
+    file_name        VARCHAR(255) NOT NULL,
+    file_url         VARCHAR(1000),
+    mime_type        VARCHAR(100),
+    file_size        BIGINT,
+    status           VARCHAR(20)  NOT NULL DEFAULT 'pending'
+                         CHECK (status IN ('pending','approved','rejected')),
+    rejection_reason TEXT,
+    uploaded_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    reviewed_at      TIMESTAMPTZ,
+    reviewed_by      UUID         REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_kyc_docs_user    ON kyc_documents (user_id, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kyc_docs_status  ON kyc_documents (status);
+
+CREATE TRIGGER kyc_profiles_updated_at
+    BEFORE UPDATE ON kyc_profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Support Tickets
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS tickets (
+    id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id          UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    broker_id        UUID         REFERENCES brokers(id) ON DELETE SET NULL,
+    subject          VARCHAR(255) NOT NULL,
+    category         VARCHAR(30)  NOT NULL DEFAULT 'general'
+                         CHECK (category IN ('general','deposit','withdrawal','technical','kyc','trading','other')),
+    priority         VARCHAR(10)  NOT NULL DEFAULT 'medium'
+                         CHECK (priority IN ('low','medium','high','urgent')),
+    status           VARCHAR(20)  NOT NULL DEFAULT 'open'
+                         CHECK (status IN ('open','in_progress','resolved','closed')),
+    assigned_to      UUID         REFERENCES users(id) ON DELETE SET NULL,
+    resolved_at      TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_user     ON tickets (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tickets_broker   ON tickets (broker_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_status   ON tickets (status, priority);
+
+CREATE TABLE IF NOT EXISTS ticket_messages (
+    id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_id    UUID         NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    author_id    UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    author_role  VARCHAR(20)  NOT NULL DEFAULT 'client',
+    body         TEXT         NOT NULL,
+    is_internal  BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_ticket_msgs_ticket ON ticket_messages (ticket_id, created_at ASC);
+
+CREATE TRIGGER tickets_updated_at
+    BEFORE UPDATE ON tickets
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Affiliate / IB Partner System
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS affiliates (
+    id                UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id           UUID         NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    broker_id         UUID         REFERENCES brokers(id) ON DELETE SET NULL,
+    name              VARCHAR(100) NOT NULL,
+    email             VARCHAR(255) NOT NULL,
+    referral_code     VARCHAR(20)  NOT NULL UNIQUE,
+    commission_type   VARCHAR(20)  NOT NULL DEFAULT 'per_lot'
+                          CHECK (commission_type IN ('spread_rebate','per_lot','cpa','revenue_share')),
+    commission_rate   NUMERIC(10,4) NOT NULL DEFAULT 3.0,
+    tier              SMALLINT     NOT NULL DEFAULT 1,
+    status            VARCHAR(20)  NOT NULL DEFAULT 'active'
+                          CHECK (status IN ('active','suspended','pending')),
+    stats             JSONB        NOT NULL DEFAULT '{}',
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_affiliates_broker ON affiliates (broker_id);
+CREATE INDEX IF NOT EXISTS idx_affiliates_code   ON affiliates (referral_code);
+
+CREATE TABLE IF NOT EXISTS affiliate_referrals (
+    id                UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    affiliate_id      UUID         NOT NULL REFERENCES affiliates(id) ON DELETE CASCADE,
+    referred_user_id  UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status            VARCHAR(20)  NOT NULL DEFAULT 'registered'
+                          CHECK (status IN ('registered','deposited','active')),
+    deposit_amount    NUMERIC(18,2) NOT NULL DEFAULT 0,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    UNIQUE (affiliate_id, referred_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_referrals_affiliate ON affiliate_referrals (affiliate_id);
+
+CREATE TABLE IF NOT EXISTS affiliate_commissions (
+    id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    affiliate_id    UUID         NOT NULL REFERENCES affiliates(id) ON DELETE CASCADE,
+    type            VARCHAR(30)  NOT NULL,
+    amount          NUMERIC(18,2) NOT NULL,
+    reference       VARCHAR(100),
+    trader_user_id  UUID         REFERENCES users(id) ON DELETE SET NULL,
+    lots            NUMERIC(10,2) NOT NULL DEFAULT 0,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_commissions_affiliate ON affiliate_commissions (affiliate_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS affiliate_payouts (
+    id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    affiliate_id    UUID         NOT NULL REFERENCES affiliates(id) ON DELETE CASCADE,
+    amount          NUMERIC(18,2) NOT NULL,
+    method          VARCHAR(30)  NOT NULL DEFAULT 'bank_transfer',
+    reference       VARCHAR(100),
+    status          VARCHAR(20)  NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','approved','paid','rejected')),
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    processed_at    TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_payouts_affiliate ON affiliate_payouts (affiliate_id, created_at DESC);
+
+CREATE TRIGGER affiliates_updated_at
+    BEFORE UPDATE ON affiliates
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Notifications
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id     UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    broker_id   UUID         REFERENCES brokers(id) ON DELETE SET NULL,
+    type        VARCHAR(30)  NOT NULL
+                    CHECK (type IN ('system','trade','payment','kyc','ticket',
+                                    'margin_call','stop_out','copy_trade','affiliate')),
+    title       VARCHAR(200) NOT NULL,
+    body        VARCHAR(1000) NOT NULL,
+    is_read     BOOLEAN      NOT NULL DEFAULT FALSE,
+    data        JSONB,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user   ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications (user_id, is_read) WHERE is_read = FALSE;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Payment Gateway
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS payment_methods (
+    id              VARCHAR(50)  PRIMARY KEY,
+    name            VARCHAR(100) NOT NULL,
+    type            VARCHAR(30)  NOT NULL
+                        CHECK (type IN ('crypto','bank_transfer','credit_card','e_wallet')),
+    currency        CHAR(10)     NOT NULL DEFAULT 'USD',
+    min_amount      NUMERIC(18,2) NOT NULL DEFAULT 10,
+    max_amount      NUMERIC(18,2) NOT NULL DEFAULT 500000,
+    fee_percent     NUMERIC(6,4) NOT NULL DEFAULT 0,
+    fee_fix         NUMERIC(10,2) NOT NULL DEFAULT 0,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'active'
+                        CHECK (status IN ('active','inactive')),
+    logo_url        VARCHAR(500),
+    instructions    TEXT,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS payment_requests (
+    id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id      UUID         NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    broker_id       UUID         REFERENCES brokers(id) ON DELETE SET NULL,
+    method_id       VARCHAR(50)  NOT NULL REFERENCES payment_methods(id),
+    type            VARCHAR(20)  NOT NULL CHECK (type IN ('deposit','withdrawal')),
+    amount          NUMERIC(18,2) NOT NULL,
+    fee             NUMERIC(10,2) NOT NULL DEFAULT 0,
+    net_amount      NUMERIC(18,2) NOT NULL,
+    currency        CHAR(10)     NOT NULL DEFAULT 'USD',
+    status          VARCHAR(20)  NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending','processing','completed','failed','cancelled')),
+    reference       VARCHAR(50)  NOT NULL UNIQUE,
+    gateway_ref     VARCHAR(200),
+    payment_address VARCHAR(500),
+    metadata        JSONB,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    expires_at      TIMESTAMPTZ,
+    completed_at    TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_user    ON payment_requests (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_status  ON payment_requests (status);
+CREATE INDEX IF NOT EXISTS idx_payments_broker  ON payment_requests (broker_id);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Audit Logs (persistent table)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id          BIGSERIAL    PRIMARY KEY,
+    broker_id   UUID         REFERENCES brokers(id) ON DELETE SET NULL,
+    user_id     UUID         REFERENCES users(id) ON DELETE SET NULL,
+    action      VARCHAR(100) NOT NULL,
+    entity      VARCHAR(50),
+    entity_id   VARCHAR(100),
+    ip_address  INET,
+    user_agent  VARCHAR(500),
+    details     JSONB,
+    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user      ON audit_logs (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_broker    ON audit_logs (broker_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action    ON audit_logs (action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created   ON audit_logs (created_at DESC);
+
+-- Add broker_id to orders for multi-tenant isolation
+ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS broker_id UUID REFERENCES brokers(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_orders_broker ON orders (broker_id);
+
+-- Add broker_id to trade_history for multi-tenant isolation
+ALTER TABLE trade_history
+    ADD COLUMN IF NOT EXISTS broker_id UUID REFERENCES brokers(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_trade_history_broker ON trade_history (broker_id);
+
+-- Add broker_id to wallet transactions for multi-tenant isolation
+-- Note: In production, run this migration after the wallet_transactions table
+-- has been created by the application schema migration.
+-- Example: ALTER TABLE wallet_transactions ADD COLUMN IF NOT EXISTS broker_id UUID REFERENCES brokers(id) ON DELETE SET NULL;
+
