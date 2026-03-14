@@ -183,11 +183,32 @@ const AppInner = () => {
             🛡 Broker
           </button>
           <button
-            className={`mode-btn${appMode === 'copytrading' ? ' mode-active' : ''}`}
-            onClick={() => setAppMode('copytrading')}
-            title="Copy Trading"
+            className={`mode-btn${appMode === 'finance' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('finance')}
+            title="Finance & Payments"
           >
-            📈 Copy
+            💳 Finance
+          </button>
+          <button
+            className={`mode-btn${appMode === 'documents' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('documents')}
+            title="Documents & KYC"
+          >
+            📄 Docs
+          </button>
+          <button
+            className={`mode-btn${appMode === 'chat' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('chat')}
+            title="Messaging"
+          >
+            💬 Chat
+          </button>
+          <button
+            className={`mode-btn${appMode === 'settings' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('settings')}
+            title="Platform Settings"
+          >
+            ⚙️ Settings
           </button>
           <button
             className={`mode-btn${appMode === 'kyc' ? ' mode-active' : ''}`}
@@ -290,6 +311,18 @@ const AppInner = () => {
           <SuperAdmin />
         </div>
       )}
+
+      {/* ── Finance & Payments ───────────────────────────────────────── */}
+      {appMode === 'finance' && <Finance />}
+
+      {/* ── Documents & KYC ──────────────────────────────────────────── */}
+      {appMode === 'documents' && <Documents />}
+
+      {/* ── Chat / Messaging ─────────────────────────────────────────── */}
+      {appMode === 'chat' && <Chat />}
+
+      {/* ── Platform Settings ────────────────────────────────────────── */}
+      {appMode === 'settings' && <Settings />}
 
       {/* ── Trading terminal layout ────────────────────────────────────── */}
       {appMode === 'terminal' && (

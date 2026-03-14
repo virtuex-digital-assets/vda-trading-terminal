@@ -201,144 +201,200 @@ CREATE TRIGGER accounts_updated_at
     BEFORE UPDATE ON accounts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- ═══════════════════════════════════════════════════════════════════════════
--- White Label Multi-Tenant Extension
--- ═══════════════════════════════════════════════════════════════════════════
-
--- ── Brokers (white label tenants) ─────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS brokers (
-    id                 UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-    slug               VARCHAR(100) NOT NULL UNIQUE,
-    name               VARCHAR(255) NOT NULL,
-    owner_email        VARCHAR(255) NOT NULL,
-    status             VARCHAR(20)  NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended','inactive')),
-    -- Branding (JSON)
-    branding           JSONB        NOT NULL DEFAULT '{}',
-    -- Domain config
-    domain             VARCHAR(255),
-    custom_domain      VARCHAR(255),
-    -- Trading conditions (JSON)
-    trading_conditions JSONB        NOT NULL DEFAULT '{}',
-    -- Features flags (JSON)
-    features           JSONB        NOT NULL DEFAULT '{}',
-    -- MT4 bridge config (JSON, sensitive - store encrypted in production)
-    mt4_config         JSONB        NOT NULL DEFAULT '{}',
-    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+-- ── Brokers ──────────────────────────────────────────────────────────────
+CREATE TABLE brokers (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    phone         VARCHAR(50),
+    country       VARCHAR(100),
+    status        VARCHAR(20)  NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','suspended')),
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_brokers_slug   ON brokers (slug);
-CREATE INDEX IF NOT EXISTS idx_brokers_status ON brokers (status);
-
--- Add broker_id to users (multi-tenant isolation)
-ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS broker_id UUID REFERENCES brokers(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_users_broker ON users (broker_id);
-
--- Add broker_id to accounts
-ALTER TABLE accounts
-    ADD COLUMN IF NOT EXISTS broker_id UUID REFERENCES brokers(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_accounts_broker ON accounts (broker_id);
-
--- ── Broker revenue tracking ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS broker_revenue (
-    id          BIGSERIAL    PRIMARY KEY,
-    broker_id   UUID         NOT NULL REFERENCES brokers(id) ON DELETE CASCADE,
-    type        VARCHAR(30)  NOT NULL CHECK (type IN ('commission','spread','deposit','withdrawal')),
-    amount      NUMERIC(18,2) NOT NULL,
-    reference   VARCHAR(100),
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+CREATE TABLE broker_users (
+    id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    broker_id  UUID        NOT NULL REFERENCES brokers(id) ON DELETE CASCADE,
+    user_id    UUID        NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
+    role       VARCHAR(50) NOT NULL DEFAULT 'broker_admin',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(broker_id, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_broker_revenue_broker ON broker_revenue (broker_id, created_at DESC);
-
--- ── Copy Trading ───────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS copy_strategies (
-    id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-    broker_id       UUID         REFERENCES brokers(id) ON DELETE SET NULL,
-    provider_id     UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    account_id      UUID         NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    name            VARCHAR(255) NOT NULL,
-    description     TEXT,
-    performance_fee NUMERIC(5,2) NOT NULL DEFAULT 20 CHECK (performance_fee BETWEEN 0 AND 50),
-    min_deposit     NUMERIC(18,2) NOT NULL DEFAULT 100,
-    max_followers   INTEGER      NOT NULL DEFAULT 100,
-    is_public       BOOLEAN      NOT NULL DEFAULT TRUE,
-    status          VARCHAR(20)  NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','closed')),
-    stats           JSONB        NOT NULL DEFAULT '{}',
-    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+-- ── CRM ─────────────────────────────────────────────────────────────────
+CREATE TABLE crm_clients (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id       UUID         REFERENCES users(id),
+    broker_id     UUID         REFERENCES brokers(id),
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
+    phone         VARCHAR(50),
+    country       VARCHAR(100),
+    status        VARCHAR(50)  NOT NULL DEFAULT 'active',
+    kyc_status    VARCHAR(50)  NOT NULL DEFAULT 'pending',
+    assigned_to   UUID         REFERENCES users(id),
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_copy_strategies_provider ON copy_strategies (provider_id);
-CREATE INDEX IF NOT EXISTS idx_copy_strategies_public   ON copy_strategies (is_public, status);
-
-CREATE TABLE IF NOT EXISTS copy_subscriptions (
-    id                   UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-    strategy_id          UUID        NOT NULL REFERENCES copy_strategies(id) ON DELETE CASCADE,
-    follower_id          UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    follower_account_id  UUID        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    risk_factor          NUMERIC(5,2) NOT NULL DEFAULT 1.0 CHECK (risk_factor BETWEEN 0.1 AND 5.0),
-    max_lots             NUMERIC(10,2) NOT NULL DEFAULT 10,
-    status               VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','cancelled')),
-    stats                JSONB       NOT NULL DEFAULT '{}',
-    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (strategy_id, follower_id)
+CREATE TABLE crm_leads (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    broker_id     UUID         REFERENCES brokers(id),
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255),
+    phone         VARCHAR(50),
+    source        VARCHAR(100),
+    status        VARCHAR(50)  NOT NULL DEFAULT 'new',
+    assigned_to   UUID         REFERENCES users(id),
+    notes         TEXT,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_copy_subs_follower  ON copy_subscriptions (follower_id);
-CREATE INDEX IF NOT EXISTS idx_copy_subs_strategy  ON copy_subscriptions (strategy_id);
-
--- ── Risk Engine ────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS order_routing (
-    ticket      BIGINT       PRIMARY KEY,
-    broker_id   UUID         REFERENCES brokers(id) ON DELETE SET NULL,
-    book        VARCHAR(10)  NOT NULL CHECK (book IN ('a-book','b-book')),
-    reason      TEXT,
-    hedge_ref   VARCHAR(100),
-    routed_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+CREATE TABLE crm_notes (
+    id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id  UUID        REFERENCES crm_clients(id) ON DELETE CASCADE,
+    lead_id    UUID        REFERENCES crm_leads(id)   ON DELETE CASCADE,
+    content    TEXT        NOT NULL,
+    author_id  UUID        NOT NULL REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Liquidity Providers ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS liquidity_providers (
-    id             VARCHAR(50)  PRIMARY KEY,
-    name           VARCHAR(255) NOT NULL,
-    type           VARCHAR(30)  NOT NULL DEFAULT 'ecn',
-    status         VARCHAR(20)  NOT NULL DEFAULT 'active',
-    priority       INTEGER      NOT NULL DEFAULT 5,
-    spread_markup  NUMERIC(10,6) NOT NULL DEFAULT 0.0001,
-    max_lots       NUMERIC(10,2) NOT NULL DEFAULT 100,
-    min_lots       NUMERIC(10,4) NOT NULL DEFAULT 0.01,
-    symbols        TEXT[]       NOT NULL DEFAULT '{}',
-    latency_ms     INTEGER      NOT NULL DEFAULT 25,
-    fill_rate      NUMERIC(5,4) NOT NULL DEFAULT 0.95,
-    stats          JSONB        NOT NULL DEFAULT '{}',
-    created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+CREATE TABLE crm_activities (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id    UUID        REFERENCES crm_clients(id) ON DELETE CASCADE,
+    lead_id      UUID        REFERENCES crm_leads(id)   ON DELETE CASCADE,
+    type         VARCHAR(50) NOT NULL,
+    description  TEXT,
+    author_id    UUID        NOT NULL REFERENCES users(id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── MT4 Servers ────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS mt4_servers (
-    id          VARCHAR(50)  PRIMARY KEY,
-    broker_id   UUID         REFERENCES brokers(id) ON DELETE SET NULL,
-    name        VARCHAR(255) NOT NULL,
-    host        VARCHAR(255) NOT NULL,
-    port        INTEGER      NOT NULL DEFAULT 443,
-    -- login/password stored encrypted in production
-    version     VARCHAR(50),
-    status      VARCHAR(20)  NOT NULL DEFAULT 'disconnected',
-    last_sync   TIMESTAMPTZ,
-    sync_stats  JSONB        NOT NULL DEFAULT '{}',
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+CREATE TABLE support_tickets (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id    UUID        REFERENCES crm_clients(id),
+    broker_id    UUID        REFERENCES brokers(id),
+    subject      VARCHAR(255) NOT NULL,
+    description  TEXT,
+    status       VARCHAR(50) NOT NULL DEFAULT 'open',
+    priority     VARCHAR(20) NOT NULL DEFAULT 'medium',
+    assigned_to  UUID        REFERENCES users(id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mt4_servers_broker ON mt4_servers (broker_id);
+-- ── Finance ──────────────────────────────────────────────────────────────
+CREATE TABLE deposits (
+    id           UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID          NOT NULL REFERENCES users(id),
+    account_id   UUID          REFERENCES accounts(id),
+    broker_id    UUID          REFERENCES brokers(id),
+    amount       NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+    currency     CHAR(3)       NOT NULL DEFAULT 'USD',
+    method       VARCHAR(100)  NOT NULL DEFAULT 'bank_transfer',
+    status       VARCHAR(50)   NOT NULL DEFAULT 'pending',
+    reference    VARCHAR(255),
+    note         TEXT,
+    approved_by  UUID          REFERENCES users(id),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
 
--- ── Update triggers ────────────────────────────────────────────────────────
-CREATE TRIGGER brokers_updated_at
-    BEFORE UPDATE ON brokers
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TABLE withdrawals (
+    id           UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID          NOT NULL REFERENCES users(id),
+    account_id   UUID          REFERENCES accounts(id),
+    broker_id    UUID          REFERENCES brokers(id),
+    amount       NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+    currency     CHAR(3)       NOT NULL DEFAULT 'USD',
+    method       VARCHAR(100)  NOT NULL DEFAULT 'bank_transfer',
+    status       VARCHAR(50)   NOT NULL DEFAULT 'pending',
+    reference    VARCHAR(255),
+    note         TEXT,
+    approved_by  UUID          REFERENCES users(id),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+-- ── Payments ─────────────────────────────────────────────────────────────
+CREATE TABLE payment_gateway_configs (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    broker_id    UUID        REFERENCES brokers(id),
+    name         VARCHAR(255) NOT NULL,
+    provider     VARCHAR(100) NOT NULL,
+    api_key      TEXT,
+    api_secret   TEXT,
+    webhook_url  VARCHAR(500),
+    mode         VARCHAR(20)  NOT NULL DEFAULT 'sandbox',
+    status       VARCHAR(20)  NOT NULL DEFAULT 'enabled',
+    config       JSONB        DEFAULT '{}',
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- ── Documents & KYC ──────────────────────────────────────────────────────
+CREATE TABLE documents (
+    id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id       UUID        NOT NULL REFERENCES users(id),
+    broker_id     UUID        REFERENCES brokers(id),
+    type          VARCHAR(100) NOT NULL CHECK (type IN ('passport','national_id','driving_license','utility_bill','bank_statement','selfie','other')),
+    filename      VARCHAR(500) NOT NULL,
+    original_name VARCHAR(500) NOT NULL,
+    mimetype      VARCHAR(100),
+    size          INTEGER,
+    status        VARCHAR(50)  NOT NULL DEFAULT 'pending',
+    reviewed_by   UUID         REFERENCES users(id),
+    review_note   TEXT,
+    uploaded_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    reviewed_at   TIMESTAMPTZ
+);
+
+CREATE TABLE kyc_reviews (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID        NOT NULL REFERENCES users(id),
+    broker_id    UUID        REFERENCES brokers(id),
+    status       VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','submitted','under_review','approved','rejected')),
+    reviewed_by  UUID        REFERENCES users(id),
+    note         TEXT,
+    submitted_at TIMESTAMPTZ,
+    reviewed_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── Chat ─────────────────────────────────────────────────────────────────
+CREATE TABLE chat_conversations (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title        VARCHAR(255),
+    type         VARCHAR(50) NOT NULL DEFAULT 'direct' CHECK (type IN ('direct','group','support','crm')),
+    participants UUID[]      NOT NULL DEFAULT '{}',
+    last_message TEXT,
+    last_message_at TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE chat_messages (
+    id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID        NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    sender_id       UUID        NOT NULL REFERENCES users(id),
+    content         TEXT        NOT NULL,
+    read_by         UUID[]      NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── Platform Settings ────────────────────────────────────────────────────
+CREATE TABLE platform_settings (
+    key          VARCHAR(100) PRIMARY KEY,
+    value        TEXT         NOT NULL DEFAULT '',
+    category     VARCHAR(100) NOT NULL DEFAULT 'general',
+    description  TEXT,
+    updated_by   UUID         REFERENCES users(id),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
 
 CREATE TRIGGER copy_strategies_updated_at
     BEFORE UPDATE ON copy_strategies
