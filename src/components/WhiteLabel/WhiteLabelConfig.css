@@ -1,0 +1,221 @@
+/* WhiteLabelConfig component styles */
+
+.wl-config {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+.wl-flash {
+  background: #1f3a1f;
+  border-left: 3px solid #3fb950;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  color: #3fb950;
+  flex-shrink: 0;
+}
+
+/* ── Platform summary bar ────────────────────────────────────────────────── */
+.wl-summary {
+  display: flex;
+  gap: 0;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+.wl-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 20px;
+  border-right: 1px solid #21262d;
+  min-width: 130px;
+}
+.wl-stat span   { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; }
+.wl-stat strong { font-size: 1rem; color: #e6edf3; margin-top: 2px; }
+
+/* ── Body (sidebar + detail) ─────────────────────────────────────────────── */
+.wl-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.wl-sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: #161b22;
+  border-right: 1px solid #21262d;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 12px;
+}
+.wl-sidebar-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #8b949e;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.wl-broker-list { display: flex; flex-direction: column; gap: 4px; }
+.wl-broker-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.1s;
+}
+.wl-broker-item:hover          { background: #0d1117; }
+.wl-broker-item-active         { background: #0d1117; border-color: #1f6feb; }
+.wl-broker-name                { font-size: 0.88rem; color: #e6edf3; font-weight: 500; }
+.wl-broker-meta                { display: flex; gap: 8px; font-size: 0.72rem; color: #8b949e; margin-top: 3px; }
+
+.wl-create-form { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Detail pane ─────────────────────────────────────────────────────────── */
+.wl-detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+.wl-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8b949e;
+  font-size: 0.9rem;
+}
+.wl-loading { color: #8b949e; font-size: 0.82rem; padding: 8px; }
+
+.wl-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.wl-detail-name    { font-size: 1.1rem; font-weight: 700; color: #e6edf3; }
+.wl-detail-actions { display: flex; gap: 8px; }
+
+.wl-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.wl-info-grid > div {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wl-info-grid span   { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; }
+.wl-info-grid strong { font-size: 0.85rem; color: #e6edf3; word-break: break-all; }
+
+.wl-stats-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.wl-stat-box {
+  flex: 1;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wl-stat-box span   { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; }
+.wl-stat-box strong { font-size: 1rem; color: #3fb950; margin-top: 4px; }
+
+/* ── Section ─────────────────────────────────────────────────────────────── */
+.wl-section {
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.wl-section-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wl-form { display: flex; flex-wrap: wrap; gap: 10px; }
+.wl-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; color: #8b949e; }
+
+.wl-brand-preview { display: flex; flex-direction: column; gap: 4px; }
+.wl-color-swatch  { width: 24px; height: 24px; border-radius: 4px; border: 1px solid #21262d; display: inline-block; }
+
+.wl-cond-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.wl-cond-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wl-cond-grid span   { font-size: 0.7rem; color: #8b949e; }
+.wl-cond-grid strong { font-size: 0.85rem; color: #e6edf3; }
+
+.wl-features { display: flex; flex-wrap: wrap; gap: 8px; }
+.wl-feature {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+.wl-feature.on  { background: #0f2416; color: #3fb950; border: 1px solid #238636; }
+.wl-feature.off { background: #1c1c1c; color: #8b949e; border: 1px solid #30363d; }
+
+/* ── Inputs & buttons ────────────────────────────────────────────────────── */
+.wl-input {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  color: #c9d1d9;
+  padding: 5px 9px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  width: 100%;
+}
+.wl-input:focus { outline: none; border-color: #58a6ff; }
+
+.wl-btn {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.wl-btn:hover        { background: #30363d; }
+.wl-btn-sm           { padding: 3px 8px; font-size: 0.72rem; }
+.wl-btn-primary      { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.wl-btn-primary:hover{ background: #388bfd; }
+.wl-btn-ok           { background: #238636; border-color: #2ea043; color: #fff; }
+.wl-btn-ok:hover     { background: #2ea043; }
+.wl-btn-warn         { background: #9e6a03; border-color: #bb8009; color: #fff; }
+.wl-btn-warn:hover   { background: #bb8009; }
+.wl-btn-danger       { background: #da3633; border-color: #f85149; color: #fff; }
+.wl-btn-danger:hover { background: #f85149; }

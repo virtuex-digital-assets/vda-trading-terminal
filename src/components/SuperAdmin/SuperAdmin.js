@@ -12,6 +12,7 @@ import CRMView from '../CRM/CRMView';
 import BrokerMonitor from '../BrokerMonitor/BrokerMonitor';
 import MarketFeed from '../MarketFeed/MarketFeed';
 import Terminal from '../Terminal/Terminal';
+import WhiteLabelConfig from '../WhiteLabel/WhiteLabelConfig';
 import backendBridge from '../../services/backendBridge';
 import './SuperAdmin.css';
 
@@ -46,18 +47,19 @@ const DEFAULT_SYMBOLS = [
   { symbol: 'BTCUSD',  spread: 50,  leverageCap: 10,  active: false },
 ];
 
-const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'audit', 'settings'];
+const TABS = ['overview', 'crm', 'risk', 'feed', 'terminal', 'accounts', 'symbols', 'trades', 'audit', 'whitelabel', 'settings'];
 const TAB_LABELS = {
-  overview: '📊 Overview',
-  crm:      '👥 CRM',
-  risk:     '🛡 Risk Monitor',
-  feed:     '🎬 Market Feed',
-  terminal: '🖥 Terminal Log',
-  accounts: '👤 Accounts',
-  symbols:  '📈 Symbols',
-  trades:   '📋 Trades',
-  audit:    '🔎 Audit Log',
-  settings: '⚙️ Settings',
+  overview:   '📊 Overview',
+  crm:        '👥 CRM',
+  risk:       '🛡 Risk Monitor',
+  feed:       '🎬 Market Feed',
+  terminal:   '🖥 Terminal Log',
+  accounts:   '👤 Accounts',
+  symbols:    '📈 Symbols',
+  trades:     '📋 Trades',
+  audit:      '🔎 Audit Log',
+  whitelabel: '🏷 White Label',
+  settings:   '⚙️ Settings',
 };
 
 // ── Demo client names ────────────────────────────────────────────────────────
@@ -761,6 +763,13 @@ const SuperAdmin = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── White Label ──────────────────────────────────────────────────── */}
+      {tab === 'whitelabel' && (
+        <div className="sa-content sa-content-full">
+          <WhiteLabelConfig />
         </div>
       )}
     </div>

@@ -22,12 +22,17 @@ const cors    = require('cors');
 const config  = require('./config/config');
 
 // Routes
-const authRoutes    = require('./routes/auth');
-const orderRoutes   = require('./routes/orders');
-const accountRoutes = require('./routes/account');
-const symbolRoutes  = require('./routes/symbols');
-const adminRoutes   = require('./routes/admin');
-const walletRoutes  = require('./routes/wallet');
+const authRoutes          = require('./routes/auth');
+const orderRoutes         = require('./routes/orders');
+const accountRoutes       = require('./routes/account');
+const symbolRoutes        = require('./routes/symbols');
+const adminRoutes         = require('./routes/admin');
+const walletRoutes        = require('./routes/wallet');
+const copyTradingRoutes   = require('./routes/copyTrading');
+const riskEngineRoutes    = require('./routes/riskEngine');
+const liquidityRoutes     = require('./routes/liquidityProviders');
+const brokerRoutes        = require('./routes/brokers');
+const mt4BridgeRoutes     = require('./routes/mt4Bridge');
 
 // Middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -52,12 +57,17 @@ app.use((req, _res, next) => {
 });
 
 // ── Routes ─────────────────────────────────────────────────────────────────
-app.use('/api/auth',    authRoutes);
-app.use('/api/orders',  orderRoutes);
-app.use('/api/account', accountRoutes);
-app.use('/api/symbols', symbolRoutes);
-app.use('/api/admin',   adminRoutes);
-app.use('/api/wallet',  walletRoutes);
+app.use('/api/auth',              authRoutes);
+app.use('/api/orders',            orderRoutes);
+app.use('/api/account',           accountRoutes);
+app.use('/api/symbols',           symbolRoutes);
+app.use('/api/admin',             adminRoutes);
+app.use('/api/wallet',            walletRoutes);
+app.use('/api/copy-trading',      copyTradingRoutes);
+app.use('/api/risk',              riskEngineRoutes);
+app.use('/api/liquidity',         liquidityRoutes);
+app.use('/api/brokers',           brokerRoutes);
+app.use('/api/mt4',               mt4BridgeRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {

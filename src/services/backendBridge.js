@@ -232,6 +232,13 @@ class BackendBridge {
     }
   }
 
+  // ── Generic REST helpers (for new platform services) ─────────────────────
+
+  get(path)              { return this._request('GET',    `/api${path}`); }
+  post(path, body)       { return this._request('POST',   `/api${path}`, body); }
+  patch(path, body)      { return this._request('PATCH',  `/api${path}`, body); }
+  delete(path)           { return this._request('DELETE', `/api${path}`); }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   _headers() {

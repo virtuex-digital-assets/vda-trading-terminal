@@ -112,6 +112,16 @@ function placeOrder({ accountId, symbol, type, lots, price, sl, tp, comment }) {
     const newFreeMargin  = parseFloat((account.equity - newMargin).toFixed(2));
     const marginLevel    = newMargin > 0 ? parseFloat(((account.equity / newMargin) * 100).toFixed(2)) : 0;
     Object.assign(account, { margin: newMargin, freeMargin: newFreeMargin, marginLevel });
+
+    // Risk engine: route order and track exposure
+    try {
+      const riskEngine = require('./riskEngine');
+      const symCfg = db.symbolRegistry && db.symbolRegistry.get(symbol);
+      const contractSize = symCfg ? symCfg.contractSize : 100000;
+      const routing = riskEngine.routeOrder({ userId: account.userId, symbol, lots, type, price: execPrice, contractSize });
+      riskEngine.recordOrderRouting(ticket, routing.book, routing.reason);
+      riskEngine.updateExposure(symbol, lots, type, execPrice, contractSize);
+    } catch (_) { /* risk engine errors must not block order placement */ }
   } else {
     db.pendingOrders.set(ticket, order);
   }
@@ -149,6 +159,17 @@ function closeOrder(ticket) {
 
   db.openOrders.delete(ticket);
   db.closedOrders.set(ticket, closedOrder);
+
+  // Risk engine: remove exposure and update trader stats
+  try {
+    const riskEngine = require('./riskEngine');
+    const symCfg = db.symbolRegistry && db.symbolRegistry.get(order.symbol);
+    const contractSize = symCfg ? symCfg.contractSize : 100000;
+    riskEngine.removeExposure(order.symbol, order.lots, order.type, order.openPrice, contractSize);
+    if (account.userId) {
+      riskEngine.updateTraderStats(account.userId, profit);
+    }
+  } catch (_) { /* must not block */ }
 
   // Update account
   const newBalance    = parseFloat((account.balance + profit).toFixed(2));
