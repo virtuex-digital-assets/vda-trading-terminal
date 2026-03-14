@@ -90,6 +90,12 @@
   gap: 16px;
 }
 
+/* Full-height content panel (no padding – child fills space) */
+.sa-content-full {
+  padding: 0;
+  overflow: hidden;
+}
+
 /* Section */
 .sa-section {
   background: #14142c;

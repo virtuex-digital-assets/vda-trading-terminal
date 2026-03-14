@@ -249,6 +249,13 @@ const AppInner = () => {
       {/* ── Market Feed ───────────────────────────────────────────────── */}
       {appMode === 'feed' && <MarketFeed />}
 
+      {/* ── Copy Trading ──────────────────────────────────────────────── */}
+      {appMode === 'copytrading' && (
+        <div className="broker-view">
+          <CopyTrading />
+        </div>
+      )}
+
       {/* ── Broker risk monitor ───────────────────────────────────────── */}
       {appMode === 'broker' && (
         <div className="broker-view">
