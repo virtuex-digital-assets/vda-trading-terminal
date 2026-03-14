@@ -305,7 +305,7 @@ export default function Tickets() {
                     className="tickets-priority-badge"
                     style={{ color: PRIORITY_COLOR[t.priority] }}
                   >
-                    {t.priority}
+                    {PRIORITIES.find((p) => p.value === t.priority)?.label || t.priority}
                   </span>
                   <span className="tickets-list-msgs">
                     💬 {(t.messages || []).length}

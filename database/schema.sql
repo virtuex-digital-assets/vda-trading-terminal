@@ -605,8 +605,7 @@ ALTER TABLE trade_history
 CREATE INDEX IF NOT EXISTS idx_trade_history_broker ON trade_history (broker_id);
 
 -- Add broker_id to wallet transactions for multi-tenant isolation
-ALTER TABLE wallet_transactions
-    ADD COLUMN IF NOT EXISTS broker_id UUID REFERENCES brokers(id) ON DELETE SET NULL
-    -- Note: wallet_transactions table must be created before this runs
-;
+-- Note: In production, run this migration after the wallet_transactions table
+-- has been created by the application schema migration.
+-- Example: ALTER TABLE wallet_transactions ADD COLUMN IF NOT EXISTS broker_id UUID REFERENCES brokers(id) ON DELETE SET NULL;
 

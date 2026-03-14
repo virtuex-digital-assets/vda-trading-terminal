@@ -535,12 +535,19 @@ describe('Payment Gateway API', () => {
   });
 
   it('POST /api/payments/withdraw initiates a withdrawal', async () => {
+    // First deposit to ensure sufficient balance (demo auto-approves deposits)
+    await request(app)
+      .post('/api/wallet/deposit')
+      .set('Authorization', `Bearer ${traderToken}`)
+      .send({ amount: 2000 });
+
     const res = await request(app)
       .post('/api/payments/withdraw')
       .set('Authorization', `Bearer ${traderToken}`)
       .send({ methodId: 'bank_wire', amount: 500 });
-    // May fail if balance too low, but should be 201 or 400
-    expect([201, 400]).toContain(res.status);
+    expect(res.status).toBe(201);
+    expect(res.body.payment.type).toBe('withdrawal');
+    expect(res.body.payment.amount).toBe(500);
   });
 
   it('GET /api/payments/history returns payment history', async () => {

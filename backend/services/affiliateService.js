@@ -47,8 +47,25 @@ const payouts = new Map();
 
 function generateReferralCode(name) {
   const slug = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6);
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let rand = '';
+  for (let i = 0; i < 4; i++) {
+    rand += chars[Math.floor(Math.random() * chars.length)];
+  }
   return `${slug}${rand}`;
+}
+
+function generateUniqueReferralCode(name) {
+  let attempts = 0;
+  while (attempts < 20) {
+    const code = generateReferralCode(name);
+    // Ensure uniqueness across all affiliates
+    const exists = [...affiliates.values()].some((a) => a.referralCode === code);
+    if (!exists) return code;
+    attempts++;
+  }
+  // Fallback: use timestamp-based code to guarantee uniqueness
+  return `IB${Date.now().toString(36).toUpperCase().slice(-8)}`;
 }
 
 // ── CRUD ───────────────────────────────────────────────────────────────────
@@ -73,7 +90,7 @@ function createAffiliate({ userId, name, email, brokerId = null, commissionType 
     userId,
     name:           String(name || '').slice(0, 100),
     email:          String(email || '').slice(0, 255),
-    referralCode:   generateReferralCode(name),
+    referralCode:   generateUniqueReferralCode(name),
     brokerId,
     commissionType,
     commissionRate: parseFloat(commissionRate) || 0,

@@ -173,6 +173,9 @@ function initiatePayment({ userId, accountId, methodId, type, amount }) {
   const netAmount = type === 'deposit' ? numAmount - fee : numAmount + fee;
   const now       = new Date();
   const expiresAt = new Date(now.getTime() + 3_600_000); // 1 hour to complete
+  const estimatedCompletionAt = method.processingMs > 0
+    ? new Date(now.getTime() + method.processingMs).toISOString()
+    : now.toISOString(); // instant
 
   // Generate payment destination for crypto
   let paymentAddress = null;
@@ -199,6 +202,7 @@ function initiatePayment({ userId, accountId, methodId, type, amount }) {
     paymentAddress,
     metadata:       {},
     instructions:   method.instructions,
+    estimatedCompletionAt,
     createdAt:      now.toISOString(),
     expiresAt:      expiresAt.toISOString(),
     completedAt:    null,
