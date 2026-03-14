@@ -187,7 +187,7 @@ const DonutChart = ({ slices }) => {
       <text x={cx} y={cy - 6} textAnchor="middle" fill="#c8d0e0" fontSize="13" fontWeight="700">
         {slices.reduce((s, sl) => s + sl.value, 0)}
       </text>
-      <text x={cx} y={cy + 10} textAnchor="middle" fill="#5566aa" fontSize="9" textTransform="uppercase">
+      <text x={cx} y={cy + 10} textAnchor="middle" fill="#5566aa" fontSize="9">
         CLIENTS
       </text>
     </svg>
