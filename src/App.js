@@ -16,6 +16,7 @@ import MarketFeed     from './components/MarketFeed/MarketFeed';
 import BrokerMonitor  from './components/BrokerMonitor/BrokerMonitor';
 import SuperAdmin     from './components/SuperAdmin/SuperAdmin';
 import Login          from './components/Login/Login';
+import CopyTrading    from './components/CopyTrading/CopyTrading';
 
 import './components/shared.css';
 import './App.css';
@@ -24,7 +25,7 @@ const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
 const API_URL        = process.env.REACT_APP_API_URL        || '';
 
 const AppInner = () => {
-  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin'
+  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin' | 'copytrading'
   const [appMode,   setAppMode]   = useState('terminal');
   const [userRole,  setUserRole]  = useState(null);   // null = not logged in
   const [showLogin, setShowLogin] = useState(false);
@@ -130,11 +131,12 @@ const AppInner = () => {
   };
 
   const modeLabel = {
-    terminal:   'Trading Terminal · MetaTrader 4 Bridge',
-    crm:        'CRM System',
-    feed:       'Market Feed',
-    broker:     'Broker Risk Monitor',
-    superadmin: 'Super Admin Control Panel',
+    terminal:    'Trading Terminal · MetaTrader 4 Bridge',
+    crm:         'CRM System',
+    feed:        'Market Feed',
+    broker:      'Broker Risk Monitor',
+    superadmin:  'Super Admin Control Panel',
+    copytrading: 'Copy Trading',
   };
 
   return (
@@ -174,6 +176,13 @@ const AppInner = () => {
           >
             🛡 Broker
           </button>
+          <button
+            className={`mode-btn${appMode === 'copytrading' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('copytrading')}
+            title="Copy Trading"
+          >
+            📈 Copy
+          </button>
           {userRole === 'super_admin' && (
             <button
               className={`mode-btn${appMode === 'superadmin' ? ' mode-active' : ''}`}
@@ -212,6 +221,13 @@ const AppInner = () => {
 
       {/* ── Market Feed ───────────────────────────────────────────────── */}
       {appMode === 'feed' && <MarketFeed />}
+
+      {/* ── Copy Trading ──────────────────────────────────────────────── */}
+      {appMode === 'copytrading' && (
+        <div className="broker-view">
+          <CopyTrading />
+        </div>
+      )}
 
       {/* ── Broker risk monitor ───────────────────────────────────────── */}
       {appMode === 'broker' && (
