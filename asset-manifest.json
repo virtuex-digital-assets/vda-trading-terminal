@@ -1,20 +1,20 @@
 {
   "files": {
-    "main.css": "/vda-trading-terminal/static/css/main.6af9a934.chunk.css",
-    "main.js": "/vda-trading-terminal/static/js/main.81d382af.chunk.js",
-    "main.js.map": "/vda-trading-terminal/static/js/main.81d382af.chunk.js.map",
+    "main.css": "/vda-trading-terminal/static/css/main.269a80ef.chunk.css",
+    "main.js": "/vda-trading-terminal/static/js/main.d5344815.chunk.js",
+    "main.js.map": "/vda-trading-terminal/static/js/main.d5344815.chunk.js.map",
     "runtime-main.js": "/vda-trading-terminal/static/js/runtime-main.3688b9ae.js",
     "runtime-main.js.map": "/vda-trading-terminal/static/js/runtime-main.3688b9ae.js.map",
     "static/js/2.0153cb26.chunk.js": "/vda-trading-terminal/static/js/2.0153cb26.chunk.js",
     "static/js/2.0153cb26.chunk.js.map": "/vda-trading-terminal/static/js/2.0153cb26.chunk.js.map",
     "index.html": "/vda-trading-terminal/index.html",
-    "static/css/main.6af9a934.chunk.css.map": "/vda-trading-terminal/static/css/main.6af9a934.chunk.css.map",
+    "static/css/main.269a80ef.chunk.css.map": "/vda-trading-terminal/static/css/main.269a80ef.chunk.css.map",
     "static/js/2.0153cb26.chunk.js.LICENSE.txt": "/vda-trading-terminal/static/js/2.0153cb26.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
     "static/js/runtime-main.3688b9ae.js",
     "static/js/2.0153cb26.chunk.js",
-    "static/css/main.6af9a934.chunk.css",
-    "static/js/main.81d382af.chunk.js"
+    "static/css/main.269a80ef.chunk.css",
+    "static/js/main.d5344815.chunk.js"
   ]
 }
