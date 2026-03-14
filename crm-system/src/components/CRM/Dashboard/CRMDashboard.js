@@ -23,7 +23,7 @@ const fmt = (n) =>
 const CRMDashboard = () => {
   const dispatch = useDispatch();
   const { clients } = useSelector((s) => s.crm);
-  const { kycDocuments, tradingAccounts, tickets, notifications } = useSelector((s) => s.broker);
+  const { kycDocuments = [], tradingAccounts = [], tickets = [], notifications = [] } = useSelector((s) => s.broker || {});
 
   const pendingKyc         = kycDocuments.filter((d) => d.status === 'pending').length;
   const activeAccounts     = tradingAccounts.filter((a) => a.status === 'active').length;
