@@ -22,12 +22,18 @@ const cors    = require('cors');
 const config  = require('./config/config');
 
 // Routes
-const authRoutes    = require('./routes/auth');
-const orderRoutes   = require('./routes/orders');
-const accountRoutes = require('./routes/account');
-const symbolRoutes  = require('./routes/symbols');
-const adminRoutes   = require('./routes/admin');
-const walletRoutes  = require('./routes/wallet');
+const authRoutes     = require('./routes/auth');
+const orderRoutes    = require('./routes/orders');
+const accountRoutes  = require('./routes/account');
+const symbolRoutes   = require('./routes/symbols');
+const adminRoutes    = require('./routes/admin');
+const walletRoutes   = require('./routes/wallet');
+const crmRoutes      = require('./routes/crm');
+const financeRoutes  = require('./routes/finance');
+const documentRoutes = require('./routes/documents');
+const chatRoutes     = require('./routes/chat');
+const settingsRoutes = require('./routes/settings');
+const brokerRoutes   = require('./routes/brokers');
 
 // Middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -52,12 +58,18 @@ app.use((req, _res, next) => {
 });
 
 // ── Routes ─────────────────────────────────────────────────────────────────
-app.use('/api/auth',    authRoutes);
-app.use('/api/orders',  orderRoutes);
-app.use('/api/account', accountRoutes);
-app.use('/api/symbols', symbolRoutes);
-app.use('/api/admin',   adminRoutes);
-app.use('/api/wallet',  walletRoutes);
+app.use('/api/auth',      authRoutes);
+app.use('/api/orders',   orderRoutes);
+app.use('/api/account',  accountRoutes);
+app.use('/api/symbols',  symbolRoutes);
+app.use('/api/admin',    adminRoutes);
+app.use('/api/wallet',   walletRoutes);
+app.use('/api/crm',      crmRoutes);
+app.use('/api/finance',  financeRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/chat',     chatRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/brokers',  brokerRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
