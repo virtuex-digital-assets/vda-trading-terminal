@@ -200,3 +200,210 @@ CREATE TRIGGER users_updated_at
 CREATE TRIGGER accounts_updated_at
     BEFORE UPDATE ON accounts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ── Brokers ──────────────────────────────────────────────────────────────
+CREATE TABLE brokers (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    phone         VARCHAR(50),
+    country       VARCHAR(100),
+    status        VARCHAR(20)  NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','suspended')),
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE broker_users (
+    id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    broker_id  UUID        NOT NULL REFERENCES brokers(id) ON DELETE CASCADE,
+    user_id    UUID        NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
+    role       VARCHAR(50) NOT NULL DEFAULT 'broker_admin',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(broker_id, user_id)
+);
+
+-- ── CRM ─────────────────────────────────────────────────────────────────
+CREATE TABLE crm_clients (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id       UUID         REFERENCES users(id),
+    broker_id     UUID         REFERENCES brokers(id),
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255) NOT NULL,
+    phone         VARCHAR(50),
+    country       VARCHAR(100),
+    status        VARCHAR(50)  NOT NULL DEFAULT 'active',
+    kyc_status    VARCHAR(50)  NOT NULL DEFAULT 'pending',
+    assigned_to   UUID         REFERENCES users(id),
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE crm_leads (
+    id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+    broker_id     UUID         REFERENCES brokers(id),
+    name          VARCHAR(255) NOT NULL,
+    email         VARCHAR(255),
+    phone         VARCHAR(50),
+    source        VARCHAR(100),
+    status        VARCHAR(50)  NOT NULL DEFAULT 'new',
+    assigned_to   UUID         REFERENCES users(id),
+    notes         TEXT,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE crm_notes (
+    id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id  UUID        REFERENCES crm_clients(id) ON DELETE CASCADE,
+    lead_id    UUID        REFERENCES crm_leads(id)   ON DELETE CASCADE,
+    content    TEXT        NOT NULL,
+    author_id  UUID        NOT NULL REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE crm_activities (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id    UUID        REFERENCES crm_clients(id) ON DELETE CASCADE,
+    lead_id      UUID        REFERENCES crm_leads(id)   ON DELETE CASCADE,
+    type         VARCHAR(50) NOT NULL,
+    description  TEXT,
+    author_id    UUID        NOT NULL REFERENCES users(id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE support_tickets (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    client_id    UUID        REFERENCES crm_clients(id),
+    broker_id    UUID        REFERENCES brokers(id),
+    subject      VARCHAR(255) NOT NULL,
+    description  TEXT,
+    status       VARCHAR(50) NOT NULL DEFAULT 'open',
+    priority     VARCHAR(20) NOT NULL DEFAULT 'medium',
+    assigned_to  UUID        REFERENCES users(id),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── Finance ──────────────────────────────────────────────────────────────
+CREATE TABLE deposits (
+    id           UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID          NOT NULL REFERENCES users(id),
+    account_id   UUID          REFERENCES accounts(id),
+    broker_id    UUID          REFERENCES brokers(id),
+    amount       NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+    currency     CHAR(3)       NOT NULL DEFAULT 'USD',
+    method       VARCHAR(100)  NOT NULL DEFAULT 'bank_transfer',
+    status       VARCHAR(50)   NOT NULL DEFAULT 'pending',
+    reference    VARCHAR(255),
+    note         TEXT,
+    approved_by  UUID          REFERENCES users(id),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE withdrawals (
+    id           UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID          NOT NULL REFERENCES users(id),
+    account_id   UUID          REFERENCES accounts(id),
+    broker_id    UUID          REFERENCES brokers(id),
+    amount       NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+    currency     CHAR(3)       NOT NULL DEFAULT 'USD',
+    method       VARCHAR(100)  NOT NULL DEFAULT 'bank_transfer',
+    status       VARCHAR(50)   NOT NULL DEFAULT 'pending',
+    reference    VARCHAR(255),
+    note         TEXT,
+    approved_by  UUID          REFERENCES users(id),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+-- ── Payments ─────────────────────────────────────────────────────────────
+CREATE TABLE payment_gateway_configs (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    broker_id    UUID        REFERENCES brokers(id),
+    name         VARCHAR(255) NOT NULL,
+    provider     VARCHAR(100) NOT NULL,
+    api_key      TEXT,
+    api_secret   TEXT,
+    webhook_url  VARCHAR(500),
+    mode         VARCHAR(20)  NOT NULL DEFAULT 'sandbox',
+    status       VARCHAR(20)  NOT NULL DEFAULT 'enabled',
+    config       JSONB        DEFAULT '{}',
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- ── Documents & KYC ──────────────────────────────────────────────────────
+CREATE TABLE documents (
+    id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id       UUID        NOT NULL REFERENCES users(id),
+    broker_id     UUID        REFERENCES brokers(id),
+    type          VARCHAR(100) NOT NULL,
+    filename      VARCHAR(500) NOT NULL,
+    original_name VARCHAR(500) NOT NULL,
+    mimetype      VARCHAR(100),
+    size          INTEGER,
+    status        VARCHAR(50)  NOT NULL DEFAULT 'pending',
+    reviewed_by   UUID         REFERENCES users(id),
+    review_note   TEXT,
+    uploaded_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    reviewed_at   TIMESTAMPTZ
+);
+
+CREATE TABLE kyc_reviews (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID        NOT NULL REFERENCES users(id),
+    broker_id    UUID        REFERENCES brokers(id),
+    status       VARCHAR(50) NOT NULL DEFAULT 'pending',
+    reviewed_by  UUID        REFERENCES users(id),
+    note         TEXT,
+    submitted_at TIMESTAMPTZ,
+    reviewed_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── Chat ─────────────────────────────────────────────────────────────────
+CREATE TABLE chat_conversations (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title        VARCHAR(255),
+    type         VARCHAR(50) NOT NULL DEFAULT 'direct',
+    participants UUID[]      NOT NULL DEFAULT '{}',
+    last_message TEXT,
+    last_message_at TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE chat_messages (
+    id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID        NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    sender_id       UUID        NOT NULL REFERENCES users(id),
+    content         TEXT        NOT NULL,
+    read_by         UUID[]      NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── Platform Settings ────────────────────────────────────────────────────
+CREATE TABLE platform_settings (
+    key          VARCHAR(100) PRIMARY KEY,
+    value        TEXT         NOT NULL DEFAULT '',
+    category     VARCHAR(100) NOT NULL DEFAULT 'general',
+    description  TEXT,
+    updated_by   UUID         REFERENCES users(id),
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- ── Audit Logs ───────────────────────────────────────────────────────────
+CREATE TABLE audit_logs (
+    id           BIGSERIAL    PRIMARY KEY,
+    user_id      UUID         REFERENCES users(id),
+    action       VARCHAR(255) NOT NULL,
+    resource     VARCHAR(100),
+    resource_id  VARCHAR(100),
+    details      JSONB,
+    ip_address   INET,
+    created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
