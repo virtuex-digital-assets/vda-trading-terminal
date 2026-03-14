@@ -17,6 +17,9 @@ import BrokerMonitor  from './components/BrokerMonitor/BrokerMonitor';
 import SuperAdmin     from './components/SuperAdmin/SuperAdmin';
 import Login          from './components/Login/Login';
 import CopyTrading    from './components/CopyTrading/CopyTrading';
+import KYC            from './components/KYC/KYC';
+import Tickets        from './components/Tickets/Tickets';
+import Affiliates     from './components/Affiliates/Affiliates';
 
 import './components/shared.css';
 import './App.css';
@@ -25,7 +28,7 @@ const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
 const API_URL        = process.env.REACT_APP_API_URL        || '';
 
 const AppInner = () => {
-  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin' | 'copytrading'
+  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin' | 'copytrading' | 'kyc' | 'tickets' | 'affiliates'
   const [appMode,   setAppMode]   = useState('terminal');
   const [userRole,  setUserRole]  = useState(null);   // null = not logged in
   const [showLogin, setShowLogin] = useState(false);
@@ -137,6 +140,9 @@ const AppInner = () => {
     broker:      'Broker Risk Monitor',
     superadmin:  'Super Admin Control Panel',
     copytrading: 'Copy Trading',
+    kyc:         'KYC Verification',
+    tickets:     'Support Tickets',
+    affiliates:  'Affiliate / IB Partner',
   };
 
   return (
@@ -183,6 +189,27 @@ const AppInner = () => {
           >
             📈 Copy
           </button>
+          <button
+            className={`mode-btn${appMode === 'kyc' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('kyc')}
+            title="KYC Verification"
+          >
+            🪪 KYC
+          </button>
+          <button
+            className={`mode-btn${appMode === 'tickets' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('tickets')}
+            title="Support Tickets"
+          >
+            🎫 Support
+          </button>
+          <button
+            className={`mode-btn${appMode === 'affiliates' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('affiliates')}
+            title="Affiliate / IB Partner"
+          >
+            🤝 Affiliate
+          </button>
           {userRole === 'super_admin' && (
             <button
               className={`mode-btn${appMode === 'superadmin' ? ' mode-active' : ''}`}
@@ -226,6 +253,27 @@ const AppInner = () => {
       {appMode === 'copytrading' && (
         <div className="broker-view">
           <CopyTrading />
+        </div>
+      )}
+
+      {/* ── KYC Verification ──────────────────────────────────────────── */}
+      {appMode === 'kyc' && (
+        <div className="broker-view">
+          <KYC />
+        </div>
+      )}
+
+      {/* ── Support Tickets ───────────────────────────────────────────── */}
+      {appMode === 'tickets' && (
+        <div className="broker-view">
+          <Tickets />
+        </div>
+      )}
+
+      {/* ── Affiliate / IB Partner ────────────────────────────────────── */}
+      {appMode === 'affiliates' && (
+        <div className="broker-view">
+          <Affiliates />
         </div>
       )}
 

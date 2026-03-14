@@ -33,6 +33,11 @@ const riskEngineRoutes    = require('./routes/riskEngine');
 const liquidityRoutes     = require('./routes/liquidityProviders');
 const brokerRoutes        = require('./routes/brokers');
 const mt4BridgeRoutes     = require('./routes/mt4Bridge');
+const kycRoutes           = require('./routes/kyc');
+const ticketRoutes        = require('./routes/tickets');
+const affiliateRoutes     = require('./routes/affiliates');
+const notificationRoutes  = require('./routes/notifications');
+const paymentRoutes       = require('./routes/payments');
 
 // Middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -68,6 +73,11 @@ app.use('/api/risk',              riskEngineRoutes);
 app.use('/api/liquidity',         liquidityRoutes);
 app.use('/api/brokers',           brokerRoutes);
 app.use('/api/mt4',               mt4BridgeRoutes);
+app.use('/api/kyc',               kycRoutes);
+app.use('/api/tickets',           ticketRoutes);
+app.use('/api/affiliates',        affiliateRoutes);
+app.use('/api/notifications',     notificationRoutes);
+app.use('/api/payments',          paymentRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
