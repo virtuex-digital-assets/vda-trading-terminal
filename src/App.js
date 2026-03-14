@@ -16,6 +16,10 @@ import MarketFeed     from './components/MarketFeed/MarketFeed';
 import BrokerMonitor  from './components/BrokerMonitor/BrokerMonitor';
 import SuperAdmin     from './components/SuperAdmin/SuperAdmin';
 import Login          from './components/Login/Login';
+import Finance        from './components/Finance/Finance';
+import Documents      from './components/Documents/Documents';
+import Chat           from './components/Chat/Chat';
+import Settings       from './components/Settings/Settings';
 
 import './components/shared.css';
 import './App.css';
@@ -24,7 +28,7 @@ const MT4_BRIDGE_URL = process.env.REACT_APP_MT4_BRIDGE_URL || '';
 const API_URL        = process.env.REACT_APP_API_URL        || '';
 
 const AppInner = () => {
-  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin'
+  // 'terminal' | 'crm' | 'feed' | 'broker' | 'superadmin' | 'finance' | 'documents' | 'chat' | 'settings'
   const [appMode,   setAppMode]   = useState('terminal');
   const [userRole,  setUserRole]  = useState(null);   // null = not logged in
   const [showLogin, setShowLogin] = useState(false);
@@ -135,6 +139,10 @@ const AppInner = () => {
     feed:       'Market Feed',
     broker:     'Broker Risk Monitor',
     superadmin: 'Super Admin Control Panel',
+    finance:    'Finance & Payments',
+    documents:  'Documents & KYC',
+    chat:       'Messaging',
+    settings:   'Platform Settings',
   };
 
   return (
@@ -173,6 +181,34 @@ const AppInner = () => {
             title="Broker Risk Monitor"
           >
             🛡 Broker
+          </button>
+          <button
+            className={`mode-btn${appMode === 'finance' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('finance')}
+            title="Finance & Payments"
+          >
+            💳 Finance
+          </button>
+          <button
+            className={`mode-btn${appMode === 'documents' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('documents')}
+            title="Documents & KYC"
+          >
+            📄 Docs
+          </button>
+          <button
+            className={`mode-btn${appMode === 'chat' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('chat')}
+            title="Messaging"
+          >
+            💬 Chat
+          </button>
+          <button
+            className={`mode-btn${appMode === 'settings' ? ' mode-active' : ''}`}
+            onClick={() => setAppMode('settings')}
+            title="Platform Settings"
+          >
+            ⚙️ Settings
           </button>
           {userRole === 'super_admin' && (
             <button
@@ -226,6 +262,18 @@ const AppInner = () => {
           <SuperAdmin />
         </div>
       )}
+
+      {/* ── Finance & Payments ───────────────────────────────────────── */}
+      {appMode === 'finance' && <Finance />}
+
+      {/* ── Documents & KYC ──────────────────────────────────────────── */}
+      {appMode === 'documents' && <Documents />}
+
+      {/* ── Chat / Messaging ─────────────────────────────────────────── */}
+      {appMode === 'chat' && <Chat />}
+
+      {/* ── Platform Settings ────────────────────────────────────────── */}
+      {appMode === 'settings' && <Settings />}
 
       {/* ── Trading terminal layout ────────────────────────────────────── */}
       {appMode === 'terminal' && (

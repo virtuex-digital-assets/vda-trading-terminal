@@ -11,9 +11,9 @@ const { auditLog } = require('../middleware/auditLog');
 router.use(apiLimiter, authMiddleware);
 
 // Documents
-router.get('/documents',              listDocuments);
-router.post('/documents',             uploadDocument);
-router.patch('/documents/:id/review', adminOnly, auditLog, reviewDocument);
+router.get('/',              listDocuments);
+router.post('/',             uploadDocument);
+router.patch('/:id/review', adminOnly, auditLog, reviewDocument);
 
 // KYC
 router.get('/kyc/:userId',            getKycStatus);
