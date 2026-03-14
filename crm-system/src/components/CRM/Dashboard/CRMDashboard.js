@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { crmSelectClient } from '../../../store/actions';
+import { crmSelectClient, crmSetView } from '../../../store/actions';
 import './CRMDashboard.css';
 
 const STAGES = ['New Lead', 'Contacted', 'KYC Submitted', 'KYC Verified', 'Funded', 'Active', 'Inactive'];
@@ -23,6 +23,13 @@ const fmt = (n) =>
 const CRMDashboard = () => {
   const dispatch = useDispatch();
   const { clients } = useSelector((s) => s.crm);
+  const { kycDocuments = [], tradingAccounts = [], tickets = [], notifications = [] } = useSelector((s) => s.broker || {});
+
+  const pendingKyc         = kycDocuments.filter((d) => d.status === 'pending').length;
+  const activeAccounts     = tradingAccounts.filter((a) => a.status === 'active').length;
+  const openTickets        = tickets.filter((t) => t.status === 'open').length;
+  const unreadNotifications = notifications.filter((n) => !n.read).length;
+  const totalBalance       = tradingAccounts.reduce((s, a) => s + (a.balance || 0), 0);
 
   const totalClients      = clients.length;
   const activeClients     = clients.filter((c) => c.stage === 'Active').length;
@@ -60,6 +67,11 @@ const CRMDashboard = () => {
           <span className="stat-card-sub">{activeClients} active</span>
         </div>
         <div className="stat-card">
+          <span className="stat-card-label">Pending KYC</span>
+          <span className="stat-card-value" style={{ color: '#ffa726' }}>{pendingKyc}</span>
+          <span className="stat-card-sub">needs review</span>
+        </div>
+        <div className="stat-card">
           <span className="stat-card-label">Total Deposits</span>
           <span className="stat-card-value positive">{fmt(totalDeposits)}</span>
           <span className="stat-card-sub">all time</span>
@@ -75,11 +87,14 @@ const CRMDashboard = () => {
           <span className="stat-card-sub">deposits − withdrawals</span>
         </div>
         <div className="stat-card">
-          <span className="stat-card-label">Open P&amp;L</span>
-          <span className={`stat-card-value ${totalOpenPL >= 0 ? 'positive' : 'negative'}`}>
-            {totalOpenPL >= 0 ? '+' : ''}{fmt(Math.abs(totalOpenPL))}
-          </span>
-          <span className="stat-card-sub">across all accounts</span>
+          <span className="stat-card-label">Active Accounts</span>
+          <span className="stat-card-value" style={{ color: '#4fc3f7' }}>{activeAccounts}</span>
+          <span className="stat-card-sub">live trading</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-card-label">Open Tickets</span>
+          <span className="stat-card-value" style={{ color: openTickets > 0 ? '#ef5350' : '#66bb6a' }}>{openTickets}</span>
+          <span className="stat-card-sub">support queue</span>
         </div>
         <div className="stat-card">
           <span className="stat-card-label">Conversion Rate</span>
@@ -140,6 +155,55 @@ const CRMDashboard = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Broker Overview */}
+        <div className="dash-panel" style={{ gridColumn: '1 / -1' }}>
+          <div className="dash-panel-header">Broker Overview</div>
+          <div className="dash-panel-body" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <div className="broker-metric">
+              <span className="broker-metric-label">Platform Balance</span>
+              <span className="broker-metric-value accent">{fmt(totalBalance)}</span>
+              <span className="broker-metric-sub">across all accounts</span>
+            </div>
+            <div className="broker-metric">
+              <span className="broker-metric-label">Trading Accounts</span>
+              <span className="broker-metric-value">{tradingAccounts.length}</span>
+              <span className="broker-metric-sub">{activeAccounts} active</span>
+            </div>
+            <div className="broker-metric">
+              <span className="broker-metric-label">Open Support Tickets</span>
+              <span className="broker-metric-value" style={{ color: openTickets > 0 ? '#ef5350' : '#66bb6a' }}>{openTickets}</span>
+              <span className="broker-metric-sub">need attention</span>
+            </div>
+            <div className="broker-metric">
+              <span className="broker-metric-label">Notifications</span>
+              <span className="broker-metric-value" style={{ color: '#ffa726' }}>{unreadNotifications}</span>
+              <span className="broker-metric-sub">unread alerts</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="dash-panel" style={{ gridColumn: '1 / -1' }}>
+          <div className="dash-panel-header">Quick Actions</div>
+          <div className="dash-panel-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button className="quick-action-btn" onClick={() => dispatch(crmSetView('kyc'))}>
+              🔍 Review KYC ({pendingKyc})
+            </button>
+            <button className="quick-action-btn" onClick={() => dispatch(crmSetView('tickets'))}>
+              🎫 Open Tickets ({openTickets})
+            </button>
+            <button className="quick-action-btn" onClick={() => dispatch(crmSetView('clients'))}>
+              👥 Manage Clients
+            </button>
+            <button className="quick-action-btn" onClick={() => dispatch(crmSetView('wallets'))}>
+              💳 Wallets &amp; Payments
+            </button>
+            <button className="quick-action-btn" onClick={() => dispatch(crmSetView('reports'))}>
+              📋 View Reports
+            </button>
           </div>
         </div>
 

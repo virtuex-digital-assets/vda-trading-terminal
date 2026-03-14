@@ -23,7 +23,7 @@
 
 .dash-stats {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -169,3 +169,45 @@
 
 .top-clients-table .positive { color: #66bb6a; }
 .top-clients-table .negative { color: #ef5350; }
+
+/* ── Broker metric tiles ─────────────────────────────────────────────────── */
+
+.broker-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+}
+.broker-metric-label {
+  font-size: 10px;
+  color: #5566aa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.broker-metric-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #c8d0e0;
+}
+.broker-metric-sub {
+  font-size: 10px;
+  color: #3a4a6a;
+}
+
+/* ── Quick action buttons ────────────────────────────────────────────────── */
+
+.quick-action-btn {
+  background: #0f3460;
+  border: 1px solid #1a4a80;
+  color: #c8d0e0;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.quick-action-btn:hover {
+  background: #16213e;
+  border-color: #4fc3f7;
+  color: #4fc3f7;
+}
