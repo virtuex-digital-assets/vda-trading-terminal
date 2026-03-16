@@ -1,20 +1,26 @@
 /**
  * Broker controller.
  *
- * Manages broker organisations and their admin users.
+ * Manages white-label broker tenants using the whiteLabelService.
  */
 
-const {
-  brokers, brokerAdmins,
-  createBroker, createBrokerAdmin,
-} = require('../models/brokerStore');
+const wl = require('../services/whiteLabelService');
 
 // ── Brokers ───────────────────────────────────────────────────────────────────
 
+function getSummary(req, res) {
+  try {
+    const summary = wl.getPlatformSummary();
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
 function listBrokers(req, res) {
   try {
-    const list = [...brokers.values()];
-    res.json(list);
+    const brokers = wl.listBrokers();
+    res.json({ brokers });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -22,9 +28,9 @@ function listBrokers(req, res) {
 
 function getBroker(req, res) {
   try {
-    const broker = brokers.get(req.params.id);
+    const broker = wl.getBroker(req.params.id);
     if (!broker) return res.status(404).json({ error: 'Broker not found' });
-    res.json(broker);
+    res.json({ broker });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -32,12 +38,12 @@ function getBroker(req, res) {
 
 function createBrokerHandler(req, res) {
   try {
-    const { name, email, phone, country } = req.body;
-    if (!name || !email) {
-      return res.status(400).json({ error: 'name and email are required' });
+    const { name, ownerEmail, domain, customDomain } = req.body;
+    if (!name || !ownerEmail) {
+      return res.status(400).json({ error: 'name and ownerEmail are required' });
     }
-    const broker = createBroker({ name, email, phone, country });
-    res.status(201).json(broker);
+    const broker = wl.createBroker({ name, ownerEmail, domain, customDomain });
+    res.status(201).json({ broker });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -45,14 +51,29 @@ function createBrokerHandler(req, res) {
 
 function updateBroker(req, res) {
   try {
-    const broker = brokers.get(req.params.id);
+    const broker = wl.updateBroker(req.params.id, req.body);
     if (!broker) return res.status(404).json({ error: 'Broker not found' });
-    const updatable = ['name', 'email', 'phone', 'country'];
-    for (const key of updatable) {
-      if (req.body[key] !== undefined) broker[key] = req.body[key];
-    }
-    broker.updatedAt = new Date().toISOString();
-    res.json(broker);
+    res.json({ broker });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+function updateBranding(req, res) {
+  try {
+    const broker = wl.updateBroker(req.params.id, { branding: req.body });
+    if (!broker) return res.status(404).json({ error: 'Broker not found' });
+    res.json({ broker });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
+function updateTradingConditions(req, res) {
+  try {
+    const broker = wl.updateBroker(req.params.id, { tradingConditions: req.body });
+    if (!broker) return res.status(404).json({ error: 'Broker not found' });
+    res.json({ broker });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -60,48 +81,36 @@ function updateBroker(req, res) {
 
 function toggleBroker(req, res) {
   try {
-    const broker = brokers.get(req.params.id);
+    const broker = wl.getBroker(req.params.id);
     if (!broker) return res.status(404).json({ error: 'Broker not found' });
-    broker.status = broker.status === 'active' ? 'inactive' : 'active';
-    broker.updatedAt = new Date().toISOString();
-    res.json(broker);
+    const updated = wl.updateBroker(req.params.id, {
+      status: broker.status === 'active' ? 'suspended' : 'active',
+    });
+    res.json({ broker: updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-// ── Broker Admins ─────────────────────────────────────────────────────────────
-
-function listBrokerAdmins(req, res) {
+function deleteBroker(req, res) {
   try {
-    const brokerId = req.params.id;
-    if (!brokers.has(brokerId)) return res.status(404).json({ error: 'Broker not found' });
-    const admins = [...brokerAdmins.values()].filter((a) => a.brokerId === brokerId);
-    res.json(admins);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
-
-function assignBrokerAdmin(req, res) {
-  try {
-    const brokerId = req.params.id;
-    if (!brokers.has(brokerId)) return res.status(404).json({ error: 'Broker not found' });
-    const { userId, role } = req.body;
-    if (!userId) return res.status(400).json({ error: 'userId is required' });
-    const brokerAdmin = createBrokerAdmin({ brokerId, userId, role: role || 'admin' });
-    res.status(201).json(brokerAdmin);
+    const exists = wl.getBroker(req.params.id);
+    if (!exists) return res.status(404).json({ error: 'Broker not found' });
+    wl.deleteBroker(req.params.id);
+    res.json({ message: 'Broker removed' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
 module.exports = {
+  getSummary,
   listBrokers,
   getBroker,
   createBroker: createBrokerHandler,
   updateBroker,
+  updateBranding,
+  updateTradingConditions,
   toggleBroker,
-  listBrokerAdmins,
-  assignBrokerAdmin,
+  deleteBroker,
 };
