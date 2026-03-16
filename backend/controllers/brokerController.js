@@ -1,26 +1,26 @@
 /**
  * Broker controller.
  *
- * Manages white-label broker organisations via the whiteLabelService.
+ * Manages white-label broker tenants using the whiteLabelService.
  */
 
 const wl = require('../services/whiteLabelService');
 
-// ── Platform summary ──────────────────────────────────────────────────────────
+// ── Brokers ───────────────────────────────────────────────────────────────────
 
-function getPlatformSummary(req, res) {
+function getSummary(req, res) {
   try {
-    res.json(wl.getPlatformSummary());
+    const summary = wl.getPlatformSummary();
+    res.json(summary);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-// ── Brokers ───────────────────────────────────────────────────────────────────
-
 function listBrokers(req, res) {
   try {
-    res.json({ brokers: wl.listBrokers() });
+    const brokers = wl.listBrokers();
+    res.json({ brokers });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -38,9 +38,11 @@ function getBroker(req, res) {
 
 function createBrokerHandler(req, res) {
   try {
-    const { name, ownerEmail } = req.body;
-    if (!name) return res.status(400).json({ error: 'name is required' });
-    const broker = wl.createBroker({ name, ownerEmail });
+    const { name, ownerEmail, domain, customDomain } = req.body;
+    if (!name || !ownerEmail) {
+      return res.status(400).json({ error: 'name and ownerEmail are required' });
+    }
+    const broker = wl.createBroker({ name, ownerEmail, domain, customDomain });
     res.status(201).json({ broker });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -77,22 +79,12 @@ function updateTradingConditions(req, res) {
   }
 }
 
-function deleteBroker(req, res) {
-  try {
-    const deleted = wl.deleteBroker(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Broker not found' });
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-}
-
 function toggleBroker(req, res) {
   try {
     const broker = wl.getBroker(req.params.id);
     if (!broker) return res.status(404).json({ error: 'Broker not found' });
     const updated = wl.updateBroker(req.params.id, {
-      status: broker.status === 'active' ? 'inactive' : 'active',
+      status: broker.status === 'active' ? 'suspended' : 'active',
     });
     res.json({ broker: updated });
   } catch (err) {
@@ -100,14 +92,25 @@ function toggleBroker(req, res) {
   }
 }
 
+function deleteBroker(req, res) {
+  try {
+    const exists = wl.getBroker(req.params.id);
+    if (!exists) return res.status(404).json({ error: 'Broker not found' });
+    wl.deleteBroker(req.params.id);
+    res.json({ message: 'Broker removed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
 module.exports = {
-  getPlatformSummary,
+  getSummary,
   listBrokers,
   getBroker,
   createBroker: createBrokerHandler,
   updateBroker,
   updateBranding,
   updateTradingConditions,
-  deleteBroker,
   toggleBroker,
+  deleteBroker,
 };
